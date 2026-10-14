@@ -138,7 +138,7 @@ Deno.serve(async (req: Request) => {
   if (action === "activate-session") {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const authorization = req.headers.get("Authorization") || "";
-    const accessToken = authorization.replace(/^Bearer\\s+/i, "").trim();
+    const accessToken = authorization.replace(/^Bearer\s+/i, "").trim();
     const sessionId = String(body.sessionId || "");
     if (!anonKey || !accessToken) return reply(401, { error: "Please sign in to continue." });
     if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return reply(400, { error: "Invalid device session." });
