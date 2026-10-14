@@ -140,14 +140,13 @@ export const api = {
     }
 
     if (path === '/api/auth/recover-password') {
-      await invokeAccountAuth({
+      const response = await invokeAccountAuth({
         action: 'recover',
         phone: body.phone,
         motherName: String(body.motherName || '').trim(),
         birthDate: String(body.birthDate || ''),
-        password: String(body.password || ''),
       });
-      return result({ ok: true });
+      return result({ ok: true, message: response?.message || 'Your reset request was sent to the administrator. Contact the administrator to complete the reset.' });
     }
 
     if (path === '/api/auth/request-reset') {
