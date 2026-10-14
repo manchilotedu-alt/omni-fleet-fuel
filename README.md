@@ -17,7 +17,8 @@
 - [x] Implement phone/password signup and sign-in with parent-name and birth-date recovery verification.
 - [x] Queue verified password recovery requests for administrator assistance; direct password changes are not allowed from the recovery form.
 - [x] Add optional native Face ID/fingerprint unlock using the device's biometric prompt.
-- [ ] Add an in-app administrator queue for password recovery requests; pending requests are currently stored securely for administrator handling.
+- [x] Add an in-app administrator queue for password recovery, scoped to the caller's organization and protected by server-side role checks.
+- [ ] Connect User Management to real Supabase Auth users and organization memberships; the existing User Management screen is still local UI state only. requests; pending requests are currently stored securely for administrator handling.
 - [ ] Connect the User Management screen to real Supabase Auth invitations and organization memberships; its current list is still app-state data, not actual login accounts.
 - [ ] Configure Vercel environment variables for mobile testing/API hosting, without touching Omni-dirsha.
 - [ ] Verify working-day/fuel calculations, calendar, reports, Excel export, and Amharic/English.
