@@ -1,0 +1,48 @@
+name: Build Android mobile app
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'vite.config.ts'
+      - 'capacitor.config.ts'
+      - 'index.html'
+      - '.github/workflows/android-mobile.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies
+        run: npm install
+      - name: Build mobile web assets
+        run: npm run build
+      - name: Add Android platform
+        run: npx cap add android
+      - name: Sync Capacitor
+        run: npx cap sync android
+      - name: Build debug APK
+        run: cd android && ./gradlew assembleDebug
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omni-fleet-fuel-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
