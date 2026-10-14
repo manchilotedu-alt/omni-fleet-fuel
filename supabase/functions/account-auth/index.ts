@@ -21,6 +21,11 @@ function normalizePhone(value: unknown): string {
   return phone;
 }
 
+function loginEmailForPhone(phone: string): string {
+  return `${phone.replace(/\D/g, "")}@users.omni-fleet-fuel.invalid`;
+}
+
+
 function normalizeName(value: unknown): string {
   return String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 }
@@ -151,6 +156,38 @@ Deno.serve(async (req: Request) => {
 
   if (await limited()) return reply(429, { error: "Too many attempts. Please wait 15 minutes and try again." });
 
+  // Prepare legacy phone-only accounts for password sign-in without enabling SMS/OTP.
+  if (action === "prepare-login") {
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (profileError || !profile?.id) {
+      await record(false);
+      return reply(200, { ok: true });
+    }
+    const { data: authData, error: authError } = await admin.auth.admin.getUserById(profile.id);
+    const authUser = authData?.user;
+    if (authError || !authUser) {
+      await record(false);
+      return reply(200, { ok: true });
+    }
+    const loginEmail = loginEmailForPhone(phone);
+    if (authUser.email !== loginEmail) {
+      const { error: updateError } = await admin.auth.admin.updateUserById(authUser.id, {
+        email: loginEmail,
+        email_confirm: true,
+      });
+      if (updateError) {
+        await record(false);
+        return reply(200, { ok: true });
+      }
+    }
+    await record(true);
+    return reply(200, { ok: true });
+  }
+
   if (action === "signup") {
     const fullName = String(body.fullName ?? "").trim().replace(/\s+/g, " ");
     const fatherName = String(body.fatherName ?? "").trim().replace(/\s+/g, " ");
@@ -176,11 +213,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data, error } = await admin.auth.admin.createUser({
+      email: loginEmailForPhone(phone),
+      email_confirm: true,
       phone,
       password,
       phone_confirm: true,
       user_metadata: {
         full_name: fullName,
+        phone,
         preferred_language: body.language === "am" ? "am" : "en",
       },
     });
