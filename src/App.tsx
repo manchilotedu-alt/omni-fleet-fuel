@@ -805,7 +805,8 @@ function AppContent() {
         localStorage.setItem('omni_ffm_last_name', user.name || '');
         if (mounted) setAuthUser(user);
       } catch {
-        sessionStorage.removeItem('omni_ffm_session_open');
+        localStorage.removeItem('omni_ffm_session_open');
+        localStorage.removeItem('omni_ffm_active_session_id');
         if (mounted) setAuthUser(null);
       }
     }).finally(() => {
