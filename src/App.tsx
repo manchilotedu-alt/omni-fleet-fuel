@@ -73,7 +73,7 @@ const translations: Record<string, string> = {
   'Email': 'ኢሜይል',
   'Birth Date': 'የትውልድ ቀን',
   "Mother's Full Name": 'የእናት ሙሉ ስም',
-  'Enter phone, mother name and birth date.': 'ስልክ፣ የእናት ሙሉ ስም እና የትውልድ ቀን ያስገቡ።', 'The phone number does not match our records.': 'የስልክ ቁጥሩ ከመረጃችን ጋር አይመሳሰልም።', "The mother's full name does not match our records.": 'የእናት ሙሉ ስሙ ከመረጃችን ጋር አይመሳሰልም።', 'The birth date does not match our records.': 'የትውልድ ቀኑ ከመረጃችን ጋር አይመሳሰልም።',
+  'The phone number does not match our records.': 'የስልክ ቁጥሩ ከመረጃችን ጋር አይመሳሰልም።', "The mother's full name does not match our records.": 'የእናት ሙሉ ስሙ ከመረጃችን ጋር አይመሳሰልም።', 'The birth date does not match our records.': 'የትውልድ ቀኑ ከመረጃችን ጋር አይመሳሰልም።',
   'Enter all required account information.': 'እባክዎ ሁሉንም የመለያ መረጃዎች ያስገቡ።',
   'Your account information is stored securely by the app server.': 'የመለያ መረጃዎ በአፕ ሰርቨር በደህንነት ይቀመጣል።',
   'Verification Code': 'የማረጋገጫ ኮድ',
