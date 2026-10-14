@@ -95,6 +95,7 @@ Deno.serve(async (req: Request) => {
         .from("account_recovery_requests")
         .select("id,user_id,phone,status,created_at")
         .in("user_id", memberIds)
+        .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(100);
       if (requestsError) return reply(500, { error: "Could not load recovery requests." });
