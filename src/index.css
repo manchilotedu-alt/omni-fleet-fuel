@@ -2159,3 +2159,11 @@ td strong { color: var(--omni-text); }
     padding: 13% 8%;
   }
 }
+
+
+.recovery-action { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
+.recovery-action input { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--border, #d6dfeb); border-radius: 10px; padding: 10px 12px; background: var(--card, #fff); color: var(--text, #172033); font: inherit; }
+.recovery-action .primary { white-space: nowrap; }
+.status-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 9px; background: rgba(20,125,224,.12); color: var(--text, #172033); font-size: 12px; font-weight: 700; text-transform: capitalize; }
+.notice-error { margin: 0 0 14px; padding: 11px 13px; border: 1px solid #d94b4b; border-radius: 10px; color: #b42318; background: rgba(217,75,75,.09); }
+
