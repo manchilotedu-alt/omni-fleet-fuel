@@ -131,7 +131,7 @@ export const api = {
     }
 
     if (path === '/api/auth/signup') {
-      const created = await invokeAccountAuth({
+      await invokeAccountAuth({
         action: 'signup',
         phone: body.phone,
         password: String(body.password || ''),
