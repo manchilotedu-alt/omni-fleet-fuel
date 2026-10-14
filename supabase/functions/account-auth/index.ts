@@ -66,7 +66,7 @@ Deno.serve(async (req: Request) => {
   if (action === "admin-recovery-list" || action === "admin-recovery-resolve") {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const authorization = req.headers.get("Authorization") || "";
-    const accessToken = authorization.replace(/^Bearer\\s+/i, "").trim();
+    const accessToken = authorization.replace(/^Bearer\s+/i, "").trim();
     if (!anonKey || !accessToken) return reply(401, { error: "Please sign in as an organization administrator." });
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${accessToken}` } },
