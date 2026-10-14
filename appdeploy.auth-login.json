@@ -1,0 +1,14 @@
+{
+  "methods": ["google", "email"],
+  "headline": "Welcome Back!",
+  "subtitle": "Secure access to omni-Fleet fuel management",
+  "style": {
+    "mode": "dark",
+    "accentColor": "#d5ff19",
+    "backgroundColor": "#030503",
+    "panelColor": "#0b0e08",
+    "textColor": "#f5f7eb",
+    "fontFamily": "Inter, system-ui, sans-serif",
+    "borderRadius": 18
+  }
+}
