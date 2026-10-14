@@ -87,6 +87,11 @@ export const api = {
       return result({ user: { ...userPayload(user), phone: profile?.phone || user.phone || '', name: profile?.full_name || userPayload(user).name } });
     }
 
+    if (path === '/api/admin/recovery-requests') {
+      const response = await invokeAccountAuth({ action: 'admin-recovery-list' });
+      return result({ requests: response?.requests || [] });
+    }
+
     if (path === '/api/fleet-data') {
       const user = await currentUser();
       const organizationId = await currentOrganizationId(user.id);
@@ -103,6 +108,15 @@ export const api = {
   },
 
   async post(path: string, body: any = {}): Promise<ApiResponse<any>> {
+    if (path === '/api/admin/recovery-requests/resolve') {
+      const response = await invokeAccountAuth({
+        action: 'admin-recovery-resolve',
+        requestId: String(body.requestId || ''),
+        newPassword: String(body.newPassword || ''),
+      });
+      return result({ ok: true, message: response?.message || 'Password reset completed.' });
+    }
+
     if (path === '/api/auth/logout') {
       const { error } = await supabase.auth.signOut();
       throwSupabaseError(error);
