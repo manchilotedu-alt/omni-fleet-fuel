@@ -751,7 +751,9 @@ function AppContent() {
   useEffect(() => {
     let mounted = true;
     const recoveryLink = /type=recovery/.test(`${window.location.hash}${window.location.search}`);
-    const sessionOpen = sessionStorage.getItem('omni_ffm_session_open') === '1';
+    const sessionOpen = localStorage.getItem('omni_ffm_session_open') === '1';
+    const lastBackgroundAt = Number(localStorage.getItem('omni_ffm_last_background_at') || 0);
+    const sessionExpired = lastBackgroundAt > 0 && Date.now() - lastBackgroundAt > 5 * 60 * 1000;
     Promise.resolve().then(async () => {
       if (recoveryLink) {
         setPasswordRecovery(true);
@@ -788,11 +790,15 @@ function AppContent() {
           return;
         }
       }
-      if (!sessionOpen) {
+      if (!sessionOpen || sessionExpired) {
         try { await api.post('/api/auth/logout'); } catch {}
+        localStorage.removeItem('omni_ffm_session_open');
+        localStorage.removeItem('omni_ffm_active_session_id');
+        localStorage.removeItem('omni_ffm_last_background_at');
         if (mounted) setAuthUser(null);
         return;
       }
+      localStorage.removeItem('omni_ffm_last_background_at');
       try {
         const response = await api.get('/api/auth/me');
         const user = response.data.user as AppUser;
@@ -806,6 +812,31 @@ function AppContent() {
       if (mounted) setAuthReady(true);
     });
     return () => { mounted = false; };
+  }, []);
+
+  // Keep the session when the app is briefly backgrounded; require sign-in only after 5 minutes.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        localStorage.setItem('omni_ffm_last_background_at', String(Date.now()));
+        return;
+      }
+      if (document.visibilityState !== 'visible') return;
+      const lastBackgroundAt = Number(localStorage.getItem('omni_ffm_last_background_at') || 0);
+      if (!lastBackgroundAt) return;
+      if (Date.now() - lastBackgroundAt > 5 * 60 * 1000) {
+        localStorage.removeItem('omni_ffm_session_open');
+        localStorage.removeItem('omni_ffm_active_session_id');
+        localStorage.removeItem('omni_ffm_last_background_at');
+        void api.post('/api/auth/logout').catch(() => {});
+        setAuthUser(null);
+        setShowMenu(false);
+      } else {
+        localStorage.removeItem('omni_ffm_last_background_at');
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   const loggedIn = Boolean(authUser);
@@ -947,7 +978,9 @@ function AppContent() {
   };
   const logout = async () => {
     if (authUser?.name) localStorage.setItem('omni_ffm_last_name', authUser.name);
-    sessionStorage.removeItem('omni_ffm_session_open');
+    localStorage.removeItem('omni_ffm_session_open');
+    localStorage.removeItem('omni_ffm_active_session_id');
+    localStorage.removeItem('omni_ffm_last_background_at');
     localStorage.removeItem('omni_ffm_biometric_enabled');
     setBiometricEnabled(false);
     try { await api.post('/api/auth/logout'); } catch {} finally {
@@ -1019,7 +1052,7 @@ function AppContent() {
   }
 
   if (!loggedIn || passwordRecovery) {
-    return <Login initialRecovery={passwordRecovery} onRecoveryComplete={() => setPasswordRecovery(false)} lang={lang} setLang={setLang} onLogin={user => { localStorage.setItem('omni_ffm_last_name', user.name); sessionStorage.setItem('omni_ffm_session_open', '1'); setAuthUser(user); }} />;
+    return <Login initialRecovery={passwordRecovery} onRecoveryComplete={() => setPasswordRecovery(false)} lang={lang} setLang={setLang} onLogin={user => { localStorage.setItem('omni_ffm_last_name', user.name); localStorage.setItem('omni_ffm_session_open', '1'); localStorage.removeItem('omni_ffm_last_background_at'); setAuthUser(user); }} />;
   }
 
   if (!dataReady) {
