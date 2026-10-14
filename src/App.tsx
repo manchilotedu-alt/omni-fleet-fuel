@@ -68,7 +68,7 @@ const translations: Record<string, string> = {
   'Telebirr': 'ቴሌብር',
   'Settings': 'ቅንብሮች',
   'Request Password Reset': 'የይለፍ ቃል መመለሻ ጥያቄ ላክ',
-  'Your reset request was sent to the administrator. Contact the administrator to complete the reset.': 'የይለፍ ቃል መመለሻ ጥያቄዎ ለአስተዳዳሪው ተልኳል። ሂደቱን ለማጠናቀቅ አስተዳዳሪውን ያነጋግሩ።',
+  'Your reset request has been recorded. Contact the administrator to complete the reset.': 'የይለፍ ቃል መመለሻ ጥያቄዎ ተመዝግቧል። ሂደቱን ለማጠናቀቅ አስተዳዳሪውን ያነጋግሩ።',
   'A password reset request is already waiting for the administrator.': 'የይለፍ ቃል መመለሻ ጥያቄዎ በአስተዳዳሪው እየተጠባበቀ ነው።',
   'Biometric Unlock': 'በፊት ወይም በጣት አሻራ መክፈቻ',
   'Use Face ID or Fingerprint to unlock this app on this device.': 'ይህን መተግበሪያ በፊት ማወቂያ ወይም በጣት አሻራ ለመክፈት ይጠቀሙ።',
@@ -1145,7 +1145,7 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
         setResetMode(false); setMode('login'); setPhone(recoveryPhone.trim()); clearPasswordFields();
         setRecoveryPhone(''); setRecoveryMother(''); setRecoveryBirthDate('');
         onRecoveryComplete();
-        setNoticeMessage(t(response.data?.message || 'Your reset request was sent to the administrator. Contact the administrator to complete the reset.'));
+        setNoticeMessage(t(response.data?.message || 'Your reset request has been recorded. Contact the administrator to complete the reset.'));
       } catch (error) {
         handleError(error, 'Password reset request failed.');
       } finally { setBusy(false); }
