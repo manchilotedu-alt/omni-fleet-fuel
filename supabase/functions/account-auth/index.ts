@@ -141,10 +141,9 @@ Deno.serve(async (req: Request) => {
   if (action === "recover") {
     const motherName = String(body.motherName ?? "").trim();
     const birthDate = String(body.birthDate ?? "").trim();
-    const password = String(body.password ?? "");
-    if (motherName.length < 2 || !/^\d{4}-\d{2}-\d{2}$/.test(birthDate) || password.length < 8 || password.length > 128) {
+    if (motherName.length < 2 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(birthDate)) {
       await record(false);
-      return reply(400, { error: "Enter your recovery details and a new password of at least 8 characters." });
+      return reply(400, { error: "Enter your phone number, mother's full name, and birth date." });
     }
     const { data: profile } = await admin.from("profiles").select("id,recovery_hash").eq("phone", phone).maybeSingle();
     const expected = profile?.recovery_hash || "";
@@ -153,13 +152,26 @@ Deno.serve(async (req: Request) => {
       await record(false);
       return reply(401, { error: "The phone number or recovery details could not be verified." });
     }
-    const { error } = await admin.auth.admin.updateUserById(profile.id, { password });
+    const { data: recent } = await admin.from("account_recovery_requests")
+      .select("id,status,created_at")
+      .eq("user_id", profile.id)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (recent?.id) {
+      await record(true);
+      return reply(200, { ok: true, message: "A password reset request is already waiting for the administrator." });
+    }
+    const { error } = await admin.from("account_recovery_requests").insert({
+      user_id: profile.id,
+      phone,
+      status: "pending",
+    });
     if (error) {
       await record(false);
-      return reply(400, { error: "Could not reset the password. Please try again." });
+      return reply(500, { error: "Could not send the reset request. Please try again." });
     }
     await record(true);
-    return reply(200, { ok: true });
+    return reply(200, { ok: true, message: "Your reset request was sent to the administrator. Contact the administrator to complete the reset." });
   }
 
   await record(false);
