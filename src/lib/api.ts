@@ -117,7 +117,6 @@ export const api = {
         motherName: String(body.motherName || '').trim(),
         fatherName: String(body.fatherName || '').trim(),
         birthDate: String(body.birthDate || ''),
-        password: String(body.password || ''),
         language: body.language === 'am' ? 'am' : 'en',
       });
       const { data, error } = await supabase.auth.signInWithPassword({
