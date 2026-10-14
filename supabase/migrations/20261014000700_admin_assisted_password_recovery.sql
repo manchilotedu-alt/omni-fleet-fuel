@@ -12,6 +12,8 @@ create index if not exists account_recovery_requests_status_time_idx
   on public.account_recovery_requests (status, created_at desc);
 create index if not exists account_recovery_requests_user_time_idx
   on public.account_recovery_requests (user_id, created_at desc);
+create unique index if not exists account_recovery_requests_one_pending_per_user_idx
+  on public.account_recovery_requests (user_id) where status = 'pending';
 alter table public.account_recovery_requests enable row level security;
 revoke all on table public.account_recovery_requests from public, anon, authenticated;
 grant all on table public.account_recovery_requests to service_role;
