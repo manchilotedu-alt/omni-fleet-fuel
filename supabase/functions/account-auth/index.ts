@@ -141,7 +141,7 @@ Deno.serve(async (req: Request) => {
   if (action === "recover") {
     const motherName = String(body.motherName ?? "").trim();
     const birthDate = String(body.birthDate ?? "").trim();
-    if (motherName.length < 2 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(birthDate)) {
+    if (motherName.length < 2 || !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
       await record(false);
       return reply(400, { error: "Enter your phone number, mother's full name, and birth date." });
     }
