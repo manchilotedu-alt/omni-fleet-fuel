@@ -9,9 +9,13 @@
 - [x] Enable row-level security and role-based organization access policies. Security advisor scan is currently clean.
 - [x] Ensure new Supabase Auth signups receive a new empty organization workspace; no demo fleet records are inserted.
 - [x] Import and verify the current AppDeploy source snapshot on `migration/appdeploy-source`.
-- [ ] Replace AppDeploy-specific frontend and backend SDK dependencies with Supabase Auth/data access (phone OTP requires an SMS provider configuration before production signup/recovery).
-- [ ] Build and test the Android/mobile app shell and mobile-only responsive layouts.
-- [ ] Migrate OTP/recovery and role management securely.
+- [x] Replace the frontend AppDeploy API client with a Supabase Auth/data adapter.
+- [ ] Retire the unused AppDeploy-only backend files after confirming no migration-only functionality depends on them.
+- [ ] Configure a Supabase SMS provider (for example, Twilio) before phone signup and password recovery can work in production.
+- [x] Add Capacitor Android configuration and an automated APK build workflow.
+- [ ] Complete Android APK build verification and test the app on a real Android phone.
+- [x] Implement Supabase phone OTP signup/recovery flow in the mobile frontend.
+- [ ] Verify OTP delivery and role-management behavior after SMS provider setup.
 - [ ] Configure Vercel environment variables for mobile testing/API hosting, without touching Omni-dirsha.
 - [ ] Verify working-day/fuel calculations, calendar, reports, Excel export, and Amharic/English.
 - [ ] Keep the original AppDeploy version untouched until the replacement passes testing.
