@@ -36,11 +36,13 @@ async function currentOrganizationId(userId: string): Promise<string> {
 }
 
 function userPayload(user: any) {
+  const email = String(user.email || '');
+  const isInternalLoginEmail = email.endsWith('@users.omni-fleet-fuel.invalid');
   return {
     id: user.id,
-    email: user.email || '',
-    phone: user.phone || '',
-    name: user.user_metadata?.full_name || user.user_metadata?.name || user.phone || user.email || 'Fleet Manager',
+    email: isInternalLoginEmail ? '' : email,
+    phone: user.phone || user.user_metadata?.phone || '',
+    name: user.user_metadata?.full_name || user.user_metadata?.name || user.phone || email || 'Fleet Manager',
   };
 }
 
@@ -52,6 +54,11 @@ function normalizePhone(value: unknown): string {
   if (!/^\+[1-9]\d{7,14}$/.test(phone)) fail('Enter a valid phone number with country code, or an Ethiopian 09/9 number.');
   return phone;
 }
+
+function loginEmailForPhone(phone: string): string {
+  return `${phone.replace(/\D/g, '')}@users.omni-fleet-fuel.invalid`;
+}
+
 
 async function invokeAccountAuth(body: Record<string, unknown>): Promise<any> {
   const { data, error } = await supabase.functions.invoke('account-auth', { body });
@@ -134,8 +141,9 @@ export const api = {
         birthDate: String(body.birthDate || ''),
         language: body.language === 'am' ? 'am' : 'en',
       });
+      const phone = normalizePhone(body.phone);
       const { data, error } = await supabase.auth.signInWithPassword({
-        phone: created.phone || normalizePhone(body.phone),
+        email: loginEmailForPhone(phone),
         password: String(body.password || ''),
       });
       throwSupabaseError(error);
@@ -145,8 +153,9 @@ export const api = {
 
     if (path === '/api/auth/login') {
       const phone = normalizePhone(body.phone);
+      await invokeAccountAuth({ action: 'prepare-login', phone });
       const { data, error } = await supabase.auth.signInWithPassword({
-        phone,
+        email: loginEmailForPhone(phone),
         password: String(body.password || ''),
       });
       throwSupabaseError(error);
