@@ -15,13 +15,6 @@ function throwSupabaseError(error: { message?: string; status?: number } | null)
   if (error) fail(error.message || 'The request could not be completed.', error.status || 400);
 }
 
-function normalizePhone(value: unknown): string {
-  const raw = String(value ?? '').replace(/[^+\d]/g, '').trim();
-  if (raw.startsWith('09') && raw.length === 10) return '+251' + raw.slice(1);
-  if (raw.startsWith('9') && raw.length === 9) return '+251' + raw;
-  if (raw.startsWith('2519') && raw.length === 12) return '+' + raw;
-  return raw;
-}
 
 async function currentUser() {
   const { data, error } = await supabase.auth.getUser();
@@ -89,9 +82,10 @@ export const api = {
     }
 
     if (path === '/api/auth/signup') {
-      const phone = normalizePhone(body.phone);
+      const email = String(body.email || '').trim().toLowerCase();
+      if (!email) fail('Email is required.');
       const { data, error } = await supabase.auth.signUp({
-        phone,
+        email,
         password: String(body.password || ''),
         options: {
           data: {
@@ -102,7 +96,7 @@ export const api = {
       });
       throwSupabaseError(error);
       if (!data.user) fail('The account could not be created.', 500);
-      return result({ user: userPayload(data.user), requiresVerification: !data.session });
+      return result({ user: userPayload(data.user), requiresEmailConfirmation: !data.session });
     }
 
     if (path === '/api/auth/verify-signup') {
@@ -118,22 +112,20 @@ export const api = {
     }
 
     if (path === '/api/auth/login') {
-      const phone = normalizePhone(body.phone);
+      const email = String(body.email || '').trim().toLowerCase();
       const { data, error } = await supabase.auth.signInWithPassword({
-        phone,
+        email,
         password: String(body.password || ''),
       });
       throwSupabaseError(error);
-      if (!data.user) fail('Sign-in was not accepted. Check the phone number and password.', 401);
+      if (!data.user) fail('Sign-in was not accepted. Check the email and password.', 401);
       return result({ user: userPayload(data.user) });
     }
 
     if (path === '/api/auth/request-reset') {
-      const phone = normalizePhone(body.phone || body.contact);
-      const { error } = await supabase.auth.signInWithOtp({
-        phone,
-        options: { shouldCreateUser: false },
-      });
+      const email = String(body.email || body.contact || '').trim().toLowerCase();
+      if (!email) fail('Email is required.');
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
       throwSupabaseError(error);
       return result({ ok: true });
     }
