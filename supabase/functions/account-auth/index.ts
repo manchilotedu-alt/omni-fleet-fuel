@@ -135,6 +135,23 @@ Deno.serve(async (req: Request) => {
     return reply(200, { ok: true, message: "Password reset completed. Tell the user to sign in with the new password." });
   }
 
+  if (action === "activate-session") {
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const authorization = req.headers.get("Authorization") || "";
+    const accessToken = authorization.replace(/^Bearer\\s+/i, "").trim();
+    const sessionId = String(body.sessionId || "");
+    if (!anonKey || !accessToken) return reply(401, { error: "Please sign in to continue." });
+    if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return reply(400, { error: "Invalid device session." });
+    const { data: sessionData, error: sessionError } = await admin.auth.getUser(accessToken);
+    if (sessionError || !sessionData.user) return reply(401, { error: "Your session is invalid. Please sign in again." });
+    const user = sessionData.user;
+    const { error: updateError } = await admin.auth.admin.updateUserById(user.id, {
+      app_metadata: { ...(user.app_metadata || {}), active_session_id: sessionId },
+    });
+    if (updateError) return reply(500, { error: "Could not activate this device session. Please try again." });
+    return reply(200, { ok: true });
+  }
+
   let phone = "";
   try { phone = normalizePhone(body.phone); } catch { return reply(400, { error: "Enter a valid phone number with country code, or an Ethiopian 09/9 number." }); }
 
@@ -144,8 +161,8 @@ Deno.serve(async (req: Request) => {
 
   async function limited(): Promise<boolean> {
     const [phoneCount, ipCount] = await Promise.all([
-      admin.from("account_recovery_attempts").select("id", { count: "exact", head: true }).eq("phone", phone).gte("attempted_at", cutoff),
-      admin.from("account_recovery_attempts").select("id", { count: "exact", head: true }).eq("ip_address", ipAddress).gte("attempted_at", cutoff),
+      admin.from("account_recovery_attempts").select("id", { count: "exact", head: true }).eq("phone", phone).eq("succeeded", false).gte("attempted_at", cutoff),
+      admin.from("account_recovery_attempts").select("id", { count: "exact", head: true }).eq("ip_address", ipAddress).eq("succeeded", false).gte("attempted_at", cutoff),
     ]);
     return (phoneCount.count ?? 0) >= 5 || (ipCount.count ?? 0) >= 12;
   }
@@ -157,6 +174,11 @@ Deno.serve(async (req: Request) => {
   if (await limited()) return reply(429, { error: "Too many attempts. Please wait 15 minutes and try again." });
 
   // Prepare legacy phone-only accounts for password sign-in without enabling SMS/OTP.
+  if (action === "login-failed") {
+    await record(false);
+    return reply(200, { ok: true });
+  }
+
   if (action === "prepare-login") {
     const { data: profile, error: profileError } = await admin
       .from("profiles")
@@ -189,7 +211,7 @@ Deno.serve(async (req: Request) => {
         return reply(200, { ok: true });
       }
     }
-    await record(true);
+    // Successful preparation is not a failed login attempt and must not consume the rate limit.
     return reply(200, { ok: true });
   }
 
