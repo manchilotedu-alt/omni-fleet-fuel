@@ -20,6 +20,13 @@ async function currentUser() {
   const { data, error } = await supabase.auth.getUser();
   throwSupabaseError(error);
   if (!data.user) fail('Please sign in to continue.', 401);
+  const activeSessionId = String(data.user.app_metadata?.active_session_id || '');
+  const localSessionId = localStorage.getItem('omni_ffm_active_session_id') || '';
+  if (activeSessionId && activeSessionId !== localSessionId) {
+    localStorage.removeItem('omni_ffm_active_session_id');
+    await supabase.auth.signOut();
+    fail('This account was signed in on another device. Please sign in again.', 401);
+  }
   return data.user;
 }
 
@@ -148,6 +155,9 @@ export const api = {
       });
       throwSupabaseError(error);
       if (!data.user) fail('The account was created, but sign-in could not be completed. Please sign in manually.', 401);
+      const sessionId = crypto.randomUUID();
+      await invokeAccountAuth({ action: 'activate-session', sessionId });
+      localStorage.setItem('omni_ffm_active_session_id', sessionId);
       return result({ user: userPayload(data.user) });
     }
 
@@ -158,8 +168,14 @@ export const api = {
         email: loginEmailForPhone(phone),
         password: String(body.password || ''),
       });
-      throwSupabaseError(error);
+      if (error) {
+        try { await invokeAccountAuth({ action: 'login-failed', phone }); } catch {}
+        throwSupabaseError(error);
+      }
       if (!data.user) fail('Sign-in was not accepted. Check the phone number and password.', 401);
+      const sessionId = crypto.randomUUID();
+      await invokeAccountAuth({ action: 'activate-session', sessionId });
+      localStorage.setItem('omni_ffm_active_session_id', sessionId);
       return result({ user: userPayload(data.user) });
     }
 
