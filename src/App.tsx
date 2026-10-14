@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from './lib/api';
+import { supabase } from './lib/supabase';
 import {
   AlertTriangle,
   Bell,
@@ -81,6 +82,12 @@ const translations: Record<string, string> = {
   'Verify Contact': 'የመገኛ አድራሻ ማረጋገጫ',
   'Recovery contact': 'የመልሶ ማግኛ መገኛ',
   'Email Address': 'የኢሜይል አድራሻ',
+  'Email': 'ኢሜይል',
+  'Email is required.': 'ኢሜይል ማስገባት ያስፈልጋል።',
+  'Use the email address registered to this account.': 'በዚህ መለያ የተመዘገበውን ኢሜይል ይጠቀሙ።',
+  'Enter your recovery email.': 'የመልሶ ማግኛ ኢሜይልዎን ያስገቡ።',
+  'Password reset email sent. Open the link in your email to set a new password.': 'የይለፍ ቃል መቀየሪያ አገናኝ በኢሜይልዎ ተልኳል። አዲስ የይለፍ ቃል ለማዘጋጀት አገናኙን ይክፈቱ።',
+  'Account created. Check your email to confirm your address, then sign in.': 'መለያው ተፈጥሯል። ኢሜይልዎን አረጋግጠው ከዚያ ይግቡ።',
   'Send Code': 'ኮድ ላክ',
   'A verification code has been sent.': 'የማረጋገጫ ኮድ ተልኳል።',
   'Enter your recovery email or phone.': 'የመልሶ ማግኛ ኢሜይል ወይም ስልክ ያስገቡ።',
@@ -668,6 +675,7 @@ function AppContent() {
   // Translation is rendered through React's t() helper. Do not mutate React-managed DOM with a MutationObserver because external text/attribute changes can conflict with React reconciliation and cause page render failures.
   const [authReady, setAuthReady] = useState(false);
   const [authUser, setAuthUser] = useState<AppUser | null>(null);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [active, setActive] = useState('Dashboard');
   const navigate = (page: string) => {
     if (page === active) return;
@@ -698,9 +706,28 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(event => {
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+    });
+    return () => authListener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
+    const recoveryLink = /type=recovery/.test(`${window.location.hash}${window.location.search}`);
     const sessionOpen = sessionStorage.getItem('omni_ffm_session_open') === '1';
     Promise.resolve().then(async () => {
+      if (recoveryLink) {
+        setPasswordRecovery(true);
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (mounted && data.session?.user) {
+            const user = data.session.user;
+            setAuthUser({ id: user.id, email: user.email || '', name: user.user_metadata?.full_name || user.email || 'Fleet Manager' });
+          }
+        } catch {}
+        return;
+      }
       if (!sessionOpen) {
         try { await api.post('/api/auth/logout'); } catch {}
         if (mounted) setAuthUser(null);
@@ -896,8 +923,8 @@ function AppContent() {
     return <div className="auth-loading"><Fuel size={28} /><strong>{t('Checking secure session...')}</strong></div>;
   }
 
-  if (!loggedIn) {
-    return <Login lang={lang} setLang={setLang} onLogin={user => { localStorage.setItem('omni_ffm_last_name', user.name); sessionStorage.setItem('omni_ffm_session_open', '1'); setAuthUser(user); }} />;
+  if (!loggedIn || passwordRecovery) {
+    return <Login initialRecovery={passwordRecovery} onRecoveryComplete={() => setPasswordRecovery(false)} lang={lang} setLang={setLang} onLogin={user => { localStorage.setItem('omni_ffm_last_name', user.name); sessionStorage.setItem('omni_ffm_session_open', '1'); setAuthUser(user); }} />;
   }
 
   if (!dataReady) {
@@ -975,60 +1002,59 @@ function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode; labe
   return <button className={'nav-item ' + (active ? 'active' : '')} onClick={onClick}>{icon}<span>{label}</span></button>;
 }
 
-function Login({ onLogin, lang, setLang }: { onLogin: (user: AppUser) => void; lang: Lang; setLang: (lang: Lang) => void }) {
+function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComplete }: { onLogin: (user: AppUser) => void; lang: Lang; setLang: (lang: Lang) => void; initialRecovery?: boolean; onRecoveryComplete: () => void }) {
   const { t } = useLanguage();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [name, setName] = useState(''); const [loginPhone, setLoginPhone] = useState('');
-  const [email, setEmail] = useState(''); const [phone, setPhone] = useState(''); const [contact, setContact] = useState(''); const [birthDate, setBirthDate] = useState(''); const [motherName, setMotherName] = useState('');
+  const [name, setName] = useState(''); const [loginEmail, setLoginEmail] = useState('');
+  const [email, setEmail] = useState(''); const [contact, setContact] = useState('');
   const [password, setPassword] = useState(''); const [confirm, setConfirm] = useState(''); const [otp, setOtp] = useState(''); const [userId, setUserId] = useState('');
   const [step, setStep] = useState<'contact' | 'otp' | 'password'>('contact'); const [channel, setChannel] = useState<'email' | 'phone' | ''>('');
   const [errorMessage, setErrorMessage] = useState(''); const [busy, setBusy] = useState(false); const [resetMode, setResetMode] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false); const [confirmVisible, setConfirmVisible] = useState(false);
+  useEffect(() => { if (initialRecovery) { setResetMode(true); setStep('password'); setErrorMessage(''); } }, [initialRecovery]);
   const handleError = (error: unknown, fallback: string) => { const e = error as { message?: string; response?: { status?: number; data?: { message?: string; error?: string; detail?: string } | string } }; const data = e.response?.data; let serverMessage = typeof data === 'string' ? data : data?.message || data?.error || data?.detail; if (!serverMessage && e.response?.status === 401 && resetMode) serverMessage = 'The submitted recovery information is incorrect.'; if (!serverMessage && e.response?.status === 401) serverMessage = 'Sign-in was not accepted. Check the phone number and password, then try again. If they are correct, the session could not be verified.'; if (!serverMessage && e.response?.status === 409) serverMessage = 'This phone number is already registered. Please check the number and try again.'; setErrorMessage(serverMessage && translations[serverMessage] ? t(serverMessage) : serverMessage || e.message || fallback); };
-  const requestReset = async () => { setBusy(true); setErrorMessage(''); try { const r = await api.post('/api/auth/request-reset', { phone: contact.trim() }); if (r.data?.ok === false) { setErrorMessage(t(r.data.message || 'Could not send the verification code.')); return; } setUserId(''); setChannel('phone'); setOtp(''); setStep('otp'); } catch (e) { handleError(e, 'Could not send the verification code.'); } finally { setBusy(false); } };
+  const requestReset = async () => { setBusy(true); setErrorMessage(''); try { await api.post('/api/auth/request-reset', { email: contact.trim() }); setResetMode(false); setMode('login'); setStep('contact'); setContact(''); setErrorMessage(t('Password reset email sent. Open the link in your email to set a new password.')); } catch (e) { handleError(e, 'Could not send the verification code.'); } finally { setBusy(false); } };
   const submit = async () => {
     if (resetMode) {
-      if (step === 'contact') { if (!contact.trim()) { setErrorMessage(t('Phone number is required.')); return; } await requestReset(); return; }
-      if (step === 'otp') { await verifyResetOtp(); return; }
+      if (step === 'contact') { if (!contact.trim()) { setErrorMessage(t('Email is required.')); return; } await requestReset(); return; }
       if (password.length < 8 || password !== confirm) { setErrorMessage(password !== confirm ? t('Passwords do not match.') : 'Password must be at least 8 characters.'); return; }
-      setBusy(true); setErrorMessage(''); try { await api.post('/api/auth/reset-password', { recoveryToken: userId, password }); setResetMode(false); setStep('contact'); setContact(''); setOtp(''); setUserId(''); setPassword(''); setConfirm(''); setErrorMessage(t('Password reset successfully. Please sign in with your new password.')); } catch (e) { handleError(e, 'Password reset failed.'); } finally { setBusy(false); } return;
+      setBusy(true); setErrorMessage(''); try { await api.post('/api/auth/reset-password', { recoveryToken: userId, password }); setResetMode(false); setStep('contact'); setContact(''); setOtp(''); setUserId(''); setPassword(''); setConfirm(''); onRecoveryComplete(); setErrorMessage(t('Password reset successfully. Please sign in with your new password.')); } catch (e) { handleError(e, 'Password reset failed.'); } finally { setBusy(false); } return;
     }
     if (mode === 'login') {
-      if (!loginPhone.trim()) { setErrorMessage(t('Phone number is required.')); return; }
+      if (!loginEmail.trim()) { setErrorMessage(t('Email is required.')); return; }
       if (password.length < 8) { setErrorMessage('Password must be at least 8 characters.'); return; }
     }
-    if (mode === 'signup' && (!name.trim() || password.length < 8)) { setErrorMessage(!name.trim() ? 'Please enter your full name.' : 'Password must be at least 8 characters.'); return; }
+    if (mode === 'signup' && (!name.trim() || !email.trim() || password.length < 8)) { setErrorMessage(!name.trim() ? 'Please enter your full name.' : 'Password must be at least 8 characters.'); return; }
     if (mode === 'signup') {
-      if (!phone.trim()) { setErrorMessage(t('Phone number is required.')); return; }
+      if (!email.trim()) { setErrorMessage(t('Email is required.')); return; }
       if (password !== confirm) { setErrorMessage(t('Passwords do not match.')); return; }
-      setBusy(true); setErrorMessage(''); try { const r = await api.post('/api/auth/signup', { name: name.trim(), phone: phone.trim(), password }); if (r.data.requiresVerification) { setContact(phone.trim()); setChannel('phone'); setOtp(''); setStep('otp'); return; } localStorage.setItem('omni_ffm_last_name', r.data.user.name); onLogin(r.data.user); } catch (e) { handleError(e, 'Could not create the account.'); } finally { setBusy(false); } return;
+      setBusy(true); setErrorMessage(''); try { const r = await api.post('/api/auth/signup', { name: name.trim(), email: email.trim(), password }); if (r.data.requiresEmailConfirmation) { setMode('login'); setName(''); setPassword(''); setConfirm(''); setErrorMessage(t('Account created. Check your email to confirm your address, then sign in.')); return; } localStorage.setItem('omni_ffm_last_name', r.data.user.name); onLogin(r.data.user); } catch (e) { handleError(e, 'Could not create the account.'); } finally { setBusy(false); } return;
     }
-    setBusy(true); setErrorMessage(''); try { const r = await api.post('/api/auth/login', { phone: loginPhone.trim(), password }); localStorage.setItem('omni_ffm_last_name', r.data.user.name); onLogin(r.data.user); } catch (e) { handleError(e, 'Could not complete the request. Please try again.'); } finally { setBusy(false); }
+    setBusy(true); setErrorMessage(''); try { const r = await api.post('/api/auth/login', { email: loginEmail.trim(), password }); localStorage.setItem('omni_ffm_last_name', r.data.user.name); onLogin(r.data.user); } catch (e) { handleError(e, 'Could not complete the request. Please try again.'); } finally { setBusy(false); }
   };
-  const verifySignup = async () => { if (!/^\d{6}$/.test(otp)) { setErrorMessage(t('Enter the 6-digit code')); return; } setBusy(true); setErrorMessage(''); try { const r = await api.post('/api/auth/verify-signup', { contact: contact.trim(), code: otp }); localStorage.setItem('omni_ffm_last_name', r.data.user.name); setStep('contact'); setOtp(''); onLogin(r.data.user); } catch (e) { handleError(e, 'Verification failed.'); } finally { setBusy(false); } };
-  const verifyResetOtp = async () => { if (!/^\d{6}$/.test(otp)) { setErrorMessage(t('Enter the 6-digit code')); return; } setBusy(true); setErrorMessage(''); try { await api.post('/api/auth/verify-reset', { contact: contact.trim(), code: otp }); setOtp(''); setUserId('verified'); setStep('password'); } catch (e) { handleError(e, 'Verification failed.'); } finally { setBusy(false); } };
-  const switchMode = (next: 'login' | 'signup') => { setResetMode(false); setMode(next); setStep('contact'); setContact(''); setChannel(''); setOtp(''); setUserId(''); setEmail(''); setPhone(''); setLoginPhone(''); setBirthDate(''); setMotherName(''); setPassword(''); setConfirm(''); setErrorMessage(''); };
-  const resetFlow = () => { setResetMode(true); setStep('contact'); setContact(''); setChannel(''); setOtp(''); setUserId(''); setBirthDate(''); setMotherName(''); setPassword(''); setConfirm(''); setErrorMessage(''); };
+  const verifySignup = async () => {};
+  const verifyResetOtp = async () => {};
+  const switchMode = (next: 'login' | 'signup') => { setResetMode(false); setMode(next); setStep('contact'); setContact(''); setChannel(''); setOtp(''); setUserId(''); setEmail(''); setLoginEmail(''); setPassword(''); setConfirm(''); setErrorMessage(''); };
+  const resetFlow = () => { setResetMode(true); setStep('contact'); setContact(''); setChannel('email'); setOtp(''); setUserId(''); setPassword(''); setConfirm(''); setErrorMessage(''); };
   const otpActive = step === 'otp'; const passwordActive = resetMode && step === 'password';
   return <div className="login-page"><div className="login-glow login-glow-one" /><div className="login-glow login-glow-two" /><div className="login-shell"><div className="login-card">
     <div className="login-card-top"><button className="login-circle-btn" type="button" aria-label={t('Back')} onClick={() => window.history.back()}><ChevronLeft size={18} /></button><button className="login-circle-btn" type="button" onClick={() => setLang(lang === 'en' ? 'am' : 'en')}>{lang === 'en' ? 'አማ' : 'EN'}</button></div>
-    <div className="login-logo-ring"><div className="login-logo-core"><Fuel size={28} /></div></div><div className="login-brand"><div className="login-welcome">{resetMode ? t('Reset Password') : mode === 'login' ? t('Welcome Back!') : otpActive ? t('Verify Contact') : t('Create Your Account')}</div><p>{resetMode ? (step === 'contact' ? t('Enter your recovery email or phone.') : step === 'otp' ? t('Enter the 6-digit code') : t('Create a new password')) : mode === 'signup' ? (otpActive ? t('Enter the 6-digit code') : t('Create a secure account with a recovery contact.')) : t('Simple secure access to omni-Fleet')}</p></div>
+    <div className="login-logo-ring"><div className="login-logo-core"><Fuel size={28} /></div></div><div className="login-brand"><div className="login-welcome">{resetMode ? t('Reset Password') : mode === 'login' ? t('Welcome Back!') : otpActive ? t('Verify Contact') : t('Create Your Account')}</div><p>{resetMode ? (step === 'contact' ? t('Enter your recovery email.') : step === 'otp' ? t('Enter the 6-digit code') : t('Create a new password')) : mode === 'signup' ? (otpActive ? t('Enter the 6-digit code') : t('Create a secure account with a recovery contact.')) : t('Simple secure access to omni-Fleet')}</p></div>
     <form className="login-form" onSubmit={e => { e.preventDefault(); if (otpActive && resetMode) verifyResetOtp(); else if (mode === 'signup' && otpActive) verifySignup(); else submit(); }}>
       {!resetMode && mode === 'signup' && <>
         <label className="login-field"><span>{t('Full Name')}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={name} onChange={e => setName(e.target.value.slice(0, 20))} maxLength={20} type="text" placeholder={t('Enter your full name')} autoComplete="name" required /></div></label>
-        <label className="login-field"><span>{t('Phone Number')}</span><div className="login-input-shell"><span className="login-input-icon">☎</span><input value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9+]/g, ''))} type="tel" placeholder="09XXXXXXXX" autoComplete="tel" required /></div></label>
+        <label className="login-field"><span>{t('Email Address')}</span><div className="login-input-shell"><span className="login-input-icon">@</span><input value={email} onChange={e => setEmail(e.target.value.trim())} type="email" placeholder="name@example.com" autoComplete="email" required /></div></label>
         <label className="login-field"><span>{t('Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={password} onChange={e => setPassword(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete="new-password" minLength={8} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
         <label className="login-field"><span>{t('Confirm Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={confirm} onChange={e => setConfirm(e.target.value)} type={confirmVisible ? 'text' : 'password'} placeholder={t('Confirm password')} autoComplete="new-password" minLength={8} required /><button className="password-eye" type="button" aria-label={confirmVisible ? t('Hide password') : t('Show password')} onClick={() => setConfirmVisible(v => !v)}>{confirmVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
       </>}
-      {!resetMode && mode === 'login' && <><label className="login-field"><span>{t('Phone Number')}</span><div className="login-input-shell"><span className="login-input-icon">☎</span><input value={loginPhone} onChange={e => setLoginPhone(e.target.value.replace(/[^0-9+]/g, '').slice(0, 13))} maxLength={13} type="tel" placeholder="09XXXXXXXX" autoComplete="tel" required /></div></label><label className="login-field"><span>{t('Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={password} onChange={e => setPassword(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete="current-password" minLength={8} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label></>}
+      {!resetMode && mode === 'login' && <><label className="login-field"><span>{t('Email Address')}</span><div className="login-input-shell"><span className="login-input-icon">@</span><input value={loginEmail} onChange={e => setLoginEmail(e.target.value.trim())} type="email" placeholder="name@example.com" autoComplete="email" required /></div></label><label className="login-field"><span>{t('Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={password} onChange={e => setPassword(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete="current-password" minLength={8} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label></>}
       {resetMode && step === 'contact' && <>
-        <label className="login-field"><span>{t('Phone Number')}</span><div className="login-input-shell"><span className="login-input-icon">☎</span><input value={contact} onChange={e => setContact(e.target.value.replace(/[^0-9+]/g, ''))} type="tel" placeholder="09XXXXXXXX" autoComplete="tel" required /></div></label>
+        <label className="login-field"><span>{t('Email Address')}</span><div className="login-input-shell"><span className="login-input-icon">@</span><input value={contact} onChange={e => setContact(e.target.value.trim())} type="email" placeholder="name@example.com" autoComplete="email" required /></div></label>
       </>}
       {otpActive && null}
-      {otpActive && <label className="login-field"><span>{t('Verification Code')}</span><div className="login-input-shell"><span className="login-input-icon">#</span><input value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" maxLength={6} type="text" placeholder={t('Enter the 6-digit code')} autoComplete="one-time-code" required /></div><small className="login-otp-note">{channel === 'email' ? t('Check your email for the verification code.') : channel === 'phone' ? t('Check your phone for the verification code.') : ''}</small></label>}
       {passwordActive && <><label className="login-field"><span>{t('Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={password} onChange={e => setPassword(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete="new-password" minLength={8} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label><label className="login-field"><span>{t('Confirm Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={confirm} onChange={e => setConfirm(e.target.value)} type={confirmVisible ? 'text' : 'password'} placeholder={t('Confirm password')} autoComplete="new-password" minLength={8} required /><button className="password-eye" type="button" aria-label={confirmVisible ? t('Hide password') : t('Show password')} onClick={() => setConfirmVisible(v => !v)}>{confirmVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label></>}
-      <div className="login-options">{!resetMode && mode === 'login' && <span className="login-create-label">{t('Use the phone number registered to this account.')}</span>}{!resetMode && mode === 'login' && <button className="login-link" type="button" disabled={busy} onClick={resetFlow}>{t('Forgot Password?')}</button>}</div>
-      <button className="login-btn" type="submit" disabled={busy || (otpActive ? otp.length !== 6 : resetMode && step === 'contact' ? !contact.trim() : passwordActive ? password.length < 8 || confirm.length < 8 : mode === 'login' ? !loginPhone.trim() || password.length < 8 : !name.trim() || password.length < 8 || !confirm || !phone.trim())}><span>{busy ? t('Checking...') : otpActive ? t('Verify') : passwordActive ? t('Reset Password') : resetMode ? t('Verify & Continue') : mode === 'login' ? t('Sign In') : t('Create Account')}</span><ChevronRight size={18} /></button>
+      <div className="login-options">{!resetMode && mode === 'login' && <span className="login-create-label">{t('Use the email address registered to this account.')}</span>}{!resetMode && mode === 'login' && <button className="login-link" type="button" disabled={busy} onClick={resetFlow}>{t('Forgot Password?')}</button>}</div>
+      <button className="login-btn" type="submit" disabled={busy || (otpActive ? otp.length !== 6 : resetMode && step === 'contact' ? !contact.trim() : passwordActive ? password.length < 8 || confirm.length < 8 : mode === 'login' ? !loginEmail.trim() || password.length < 8 : !name.trim() || !email.trim() || password.length < 8 || !confirm)}><span>{busy ? t('Checking...') : otpActive ? t('Verify') : passwordActive ? t('Reset Password') : resetMode ? t('Verify & Continue') : mode === 'login' ? t('Sign In') : t('Create Account')}</span><ChevronRight size={18} /></button>
       {errorMessage && <div className="login-error">{errorMessage}</div>}<div className="login-create"><span>{resetMode ? t('Remembered your password?') : mode === 'login' ? t('Create Your Account?') : t('Already have an account?')}</span><button type="button" className="login-link strong" onClick={() => switchMode(resetMode ? 'login' : mode === 'login' ? 'signup' : 'login')}>{resetMode ? t('Sign In') : mode === 'login' ? t('Sign up') : t('Sign In')}</button></div>
     </form><div className="login-secure-note"><CheckCircle2 size={15} /><span>{t('Your account information is stored securely by the app server.')}</span></div><div className="login-language login-language-bottom"><button className={lang === 'am' ? 'selected-language' : ''} onClick={() => setLang('am')}>አማርኛ</button><span>·</span><button className={lang === 'en' ? 'selected-language' : ''} onClick={() => setLang('en')}>English</button></div>
   </div><div className="login-brand-mark"><span className="login-brand-dot"><Fuel size={16} /></span><strong>omni-Fleet</strong></div></div></div>;
