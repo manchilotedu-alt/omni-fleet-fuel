@@ -12,6 +12,16 @@ on:
       - 'capacitor.config.ts'
       - 'index.html'
       - '.github/workflows/android-mobile.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'vite.config.ts'
+      - 'capacitor.config.ts'
+      - 'index.html'
+      - '.github/workflows/android-mobile.yml'
 
 permissions:
   contents: read
