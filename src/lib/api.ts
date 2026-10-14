@@ -146,7 +146,7 @@ export const api = {
         motherName: String(body.motherName || '').trim(),
         birthDate: String(body.birthDate || ''),
       });
-      return result({ ok: true, message: response?.message || 'Your reset request was sent to the administrator. Contact the administrator to complete the reset.' });
+      return result({ ok: true, message: response?.message || 'Your reset request has been recorded. Contact the administrator to complete the reset.' });
     }
 
     if (path === '/api/auth/request-reset') {
