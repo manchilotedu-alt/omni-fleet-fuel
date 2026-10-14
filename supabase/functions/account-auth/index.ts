@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
       const { data: profiles } = userIds.length
         ? await admin.from("profiles").select("id,full_name").in("id", userIds)
         : { data: [] as { id: string; full_name: string }[] };
-      const names = new Map((profiles || []).map((profile: { id: string; full_name: string }) => [profile.id, profile.full_name]));
+      const names = new Map<string, string>((profiles || []).map((profile: { id: string; full_name: string }) => [profile.id, profile.full_name] as [string, string]));
       return reply(200, { requests: (requests || []).map((request: Record<string, unknown>) => ({ ...request, full_name: names.get(String(request.user_id)) || "Fleet user" })) });
     }
 
