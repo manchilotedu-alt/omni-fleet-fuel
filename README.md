@@ -11,11 +11,13 @@
 - [x] Import and verify the current AppDeploy source snapshot on `migration/appdeploy-source`.
 - [x] Replace the frontend AppDeploy API client with a Supabase Auth/data adapter.
 - [ ] Retire the unused AppDeploy-only backend files after confirming no migration-only functionality depends on them.
-- [ ] Configure a Supabase SMS provider (for example, Twilio) before phone signup and password recovery can work in production.
+- [x] Use phone number + password for account signup/sign-in; no SMS OTP provider is required for the selected flow.
 - [x] Add Capacitor Android configuration and an automated APK build workflow.
-- [ ] Complete Android APK build verification and test the app on a real Android phone.
-- [x] Implement Supabase phone OTP signup/recovery flow in the mobile frontend.
-- [ ] Verify OTP delivery after SMS provider setup.
+- [ ] Complete Android APK build verification and test the app on a real Android phone, including biometric unlock on a device with enrolled biometrics.
+- [x] Implement phone/password signup and sign-in with parent-name and birth-date recovery verification.
+- [x] Queue verified password recovery requests for administrator assistance; direct password changes are not allowed from the recovery form.
+- [x] Add optional native Face ID/fingerprint unlock using the device's biometric prompt.
+- [ ] Add an in-app administrator queue for password recovery requests; pending requests are currently stored securely for administrator handling.
 - [ ] Connect the User Management screen to real Supabase Auth invitations and organization memberships; its current list is still app-state data, not actual login accounts.
 - [ ] Configure Vercel environment variables for mobile testing/API hosting, without touching Omni-dirsha.
 - [ ] Verify working-day/fuel calculations, calendar, reports, Excel export, and Amharic/English.
