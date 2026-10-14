@@ -1,3 +1,4 @@
+# Rebuild on migration branch updates so current source is validated.
 name: Build Android mobile app
 
 on:
