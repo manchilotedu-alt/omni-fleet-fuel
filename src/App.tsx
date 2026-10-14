@@ -199,7 +199,6 @@ const translations: Record<string, string> = {
 
   'Reset Password': 'የይለፍ ቃል ዳግም አዘጋጅ',
   'Phone Number': 'ስልክ ቁጥር',
-  'Enter phone, mother name and birth date.': 'ስልክ፣ የእናት ሙሉ ስምና የትውልድ ቀን ያስገቡ።',
   "Father's Full Name": 'የአባት ሙሉ ስም',
   "Enter your mother's full name": 'የእናትዎን ሙሉ ስም ያስገቡ',
   "Enter your father's full name": 'የአባትዎን ሙሉ ስም ያስገቡ',
