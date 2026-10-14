@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from './lib/api';
+import { Capacitor } from '@capacitor/core';
+import { Biometrics } from '@capawesome-team/capacitor-biometrics';
 import { supabase } from './lib/supabase';
 import {
   AlertTriangle,
@@ -65,6 +67,15 @@ const translations: Record<string, string> = {
   'Add vehicle now': 'ተሽከርካሪ አሁን ጨምር',
   'Telebirr': 'ቴሌብር',
   'Settings': 'ቅንብሮች',
+  'Biometric Unlock': 'በፊት ወይም በጣት አሻራ መክፈቻ',
+  'Use Face ID or Fingerprint to unlock this app on this device.': 'ይህን መተግበሪያ በፊት ማወቂያ ወይም በጣት አሻራ ለመክፈት ይጠቀሙ።',
+  'Enable biometric unlock': 'የባዮሜትሪክ መክፈቻን አብራ',
+  'Disable biometric unlock': 'የባዮሜትሪክ መክፈቻን አጥፋ',
+  'Biometric unlock enabled on this device.': 'በዚህ መሣሪያ የባዮሜትሪክ መክፈቻ በርቷል።',
+  'Biometric unlock disabled.': 'የባዮሜትሪክ መክፈቻ ጠፍቷል።',
+  'Biometric authentication is available only in the installed mobile app.': 'የባዮሜትሪክ ማረጋገጫ በተጫነው የሞባይል መተግበሪያ ብቻ ይሰራል።',
+  'Set up Face ID or fingerprint on your device first.': 'መጀመሪያ በስልክዎ ቅንብር ውስጥ የፊት ወይም የጣት አሻራ ማረጋገጫን ያዘጋጁ።',
+  'Biometric authentication was not completed. You can still sign in with your password.': 'የባዮሜትሪክ ማረጋገጫው አልተጠናቀቀም። አሁንም በይለፍ ቃል መግባት ይችላሉ።',
   'Profile': 'መገለጫ',
   'Notifications': 'ማሳወቂያዎች',
   'Change photo': 'ፎቶ ቀይር',
@@ -687,6 +698,7 @@ function AppContent() {
   // Translation is rendered through React's t() helper. Do not mutate React-managed DOM with a MutationObserver because external text/attribute changes can conflict with React reconciliation and cause page render failures.
   const [authReady, setAuthReady] = useState(false);
   const [authUser, setAuthUser] = useState<AppUser | null>(null);
+  const [biometricEnabled, setBiometricEnabled] = useState(() => localStorage.getItem('omni_ffm_biometric_enabled') === '1');
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [active, setActive] = useState('Dashboard');
   const navigate = (page: string) => {
@@ -739,6 +751,29 @@ function AppContent() {
           }
         } catch {}
         return;
+      }
+      if (!sessionOpen && localStorage.getItem('omni_ffm_biometric_enabled') === '1') {
+        try {
+          if (!Capacitor.isNativePlatform()) throw new Error('Biometric authentication is available only in the installed mobile app.');
+          const available = await Biometrics.isAvailable();
+          const enrolled = await Biometrics.isEnrolled();
+          if (!available.isAvailable || !enrolled.isEnrolled) throw new Error('Set up Face ID or fingerprint on your device first.');
+          await Biometrics.authenticate({
+            title: 'Unlock Omni Fleet Fuel',
+            subtitle: 'Verify it is you to continue',
+            cancelButtonText: 'Use password',
+            iosFallbackButtonText: 'Use passcode',
+            allowDeviceCredential: true,
+          });
+          const response = await api.get('/api/auth/me');
+          const user = response.data.user as AppUser;
+          localStorage.setItem('omni_ffm_last_name', user.name || '');
+          if (mounted) setAuthUser(user);
+          return;
+        } catch {
+          if (mounted) setAuthUser(null);
+          return;
+        }
       }
       if (!sessionOpen) {
         try { await api.post('/api/auth/logout'); } catch {}
@@ -864,9 +899,43 @@ function AppContent() {
     setToast(message);
     window.setTimeout(() => setToast(''), 2200);
   };
+  const toggleBiometric = async () => {
+    if (biometricEnabled) {
+      localStorage.removeItem('omni_ffm_biometric_enabled');
+      setBiometricEnabled(false);
+      notify('Biometric unlock disabled.');
+      return;
+    }
+    if (!Capacitor.isNativePlatform()) {
+      notify('Biometric authentication is available only in the installed mobile app.');
+      return;
+    }
+    try {
+      const available = await Biometrics.isAvailable();
+      const enrolled = await Biometrics.isEnrolled();
+      if (!available.isAvailable || !enrolled.isEnrolled) {
+        notify('Set up Face ID or fingerprint on your device first.');
+        return;
+      }
+      await Biometrics.authenticate({
+        title: 'Enable biometric unlock',
+        subtitle: 'Confirm your identity to enable quick unlock',
+        cancelButtonText: 'Cancel',
+        iosFallbackButtonText: 'Use passcode',
+        allowDeviceCredential: true,
+      });
+      localStorage.setItem('omni_ffm_biometric_enabled', '1');
+      setBiometricEnabled(true);
+      notify('Biometric unlock enabled on this device.');
+    } catch {
+      notify('Biometric authentication was not completed. You can still sign in with your password.');
+    }
+  };
   const logout = async () => {
     if (authUser?.name) localStorage.setItem('omni_ffm_last_name', authUser.name);
     sessionStorage.removeItem('omni_ffm_session_open');
+    localStorage.removeItem('omni_ffm_biometric_enabled');
+    setBiometricEnabled(false);
     try { await api.post('/api/auth/logout'); } catch {} finally {
       setAuthUser(null);
       setShowMenu(false);
@@ -964,7 +1033,7 @@ function AppContent() {
     'Fuel Priority': <FuelPriority states={states} initialFilter={fuelPriorityFilter} onSelect={v => { setSelected(v); navigate('Vehicle Details'); }} />, 
     'Fuel History': <FuelHistory fuel={fuel} states={states} onSelect={v => { setSelected(v); navigate('Vehicle Details'); }} />,
     Reports: <><MonthlyFinanceBoard states={states} offDays={offDays} fuel={fuel} settings={settings} onSelect={v => { setSelected(v); navigate('Vehicle Details'); }} /><MonthlyReport fuel={fuel} states={states} onSelect={v => { setSelected(v); navigate('Vehicle Details'); }} /></>,
-    Settings: <SettingsPage settings={settings} onSave={next => { setSettings(next); notify('Settings saved'); }} />,
+    Settings: <SettingsPage settings={settings} onSave={next => { setSettings(next); notify('Settings saved'); }} biometricEnabled={biometricEnabled} onToggleBiometric={toggleBiometric} />,
     'User Management': <UserManagement users={users} setUsers={setUsers} onNotify={notify} />,
     Profile: <ProfilePage user={authUser} photo={profilePhoto} onPhotoChange={setProfilePhoto} onNavigate={navigate} onNotify={notify} />,
   };
@@ -1513,11 +1582,11 @@ function ProfilePage({ user, photo, onPhotoChange, onNavigate, onNotify }: { use
   return <div className="content"><button type="button" className="back-btn profile-back-btn" onClick={() => onNavigate('Dashboard')}><ChevronLeft size={19} /> {t('Home')}</button><div className="profile-card"><div className="profile-cover"><div className="profile-avatar-wrap">{photo ? <img className="profile-avatar" src={photo} alt="Profile" /> : <div className="profile-avatar profile-avatar-placeholder"><UserCircle size={52} /></div>}<button type="button" className="profile-camera" onClick={() => inputRef.current?.click()}><Edit3 size={14} /></button></div></div><div className="profile-body"><h2>{user?.name || t('Administrator')}</h2><p>{user?.phone || user?.email || t('Fleet Manager')}</p><input ref={inputRef} hidden type="file" accept="image/*" onChange={e => choosePhoto(e.target.files?.[0])} /><div className="profile-actions"><button type="button" className="primary" onClick={() => inputRef.current?.click()}><Edit3 size={16} /> {t('Change photo')}</button>{photo && <button type="button" className="outline" onClick={() => onPhotoChange('')}>{t('Remove photo')}</button>}<button type="button" className="outline" onClick={() => onNavigate('Settings')}><Settings size={16} /> {t('Settings')}</button></div><div className="profile-info-grid"><div><span>{t('Full Name')}</span><strong>{user?.name || '—'}</strong></div><div><span>{t('Phone Number')}</span><strong>{user?.phone || '—'}</strong></div><div><span>{t('Account')}</span><strong>{t('Active')}</strong></div></div></div></div></div>;
 }
 
-function SettingsPage({ settings, onSave }: { settings: AppSettings; onSave: (settings: AppSettings) => void }) {
+function SettingsPage({ settings, onSave, biometricEnabled, onToggleBiometric }: { settings: AppSettings; onSave: (settings: AppSettings) => void; biometricEnabled: boolean; onToggleBiometric: () => void }) {
   const { t } = useLanguage();
   const [draft, setDraft] = useState<AppSettings>(settings);
   useEffect(() => setDraft(settings), [settings]);
-  return <div className="content"><div className="settings-card"><h2>{t('Fuel Scheduling Rules')}</h2><p className="muted">{t('The system uses management-supplied data. Sundays are excluded by default and vehicle-specific off-days can be registered.')}</p><SelectField label="Default Currency" value={draft.currency} onChange={value => setDraft(prev => ({ ...prev, currency: value as AppSettings['currency'] }))} options={['ETB (Birr)', 'USD']} /><label className="check"><input type="checkbox" checked={draft.sundayOff} onChange={e => setDraft(prev => ({ ...prev, sundayOff: e.target.checked }))} /> {t('Sunday as Off-Day (default)')}</label><label className="check"><input type="checkbox" checked={draft.customOffDays} onChange={e => setDraft(prev => ({ ...prev, customOffDays: e.target.checked }))} /> {t('Enable custom off-days')}</label><label className="check"><input type="checkbox" checked={draft.requireManualApproval} onChange={e => setDraft(prev => ({ ...prev, requireManualApproval: e.target.checked }))} /> {t('Require approval for Manual Override')}</label><button type="button" className="primary" onClick={() => onSave(draft)}>{t('Save Settings')}</button></div></div>;
+  return <div className="content"><div className="settings-card"><h2>{t('Fuel Scheduling Rules')}</h2><p className="muted">{t('The system uses management-supplied data. Sundays are excluded by default and vehicle-specific off-days can be registered.')}</p><SelectField label="Default Currency" value={draft.currency} onChange={value => setDraft(prev => ({ ...prev, currency: value as AppSettings['currency'] }))} options={['ETB (Birr)', 'USD']} /><label className="check"><input type="checkbox" checked={draft.sundayOff} onChange={e => setDraft(prev => ({ ...prev, sundayOff: e.target.checked }))} /> {t('Sunday as Off-Day (default)')}</label><label className="check"><input type="checkbox" checked={draft.customOffDays} onChange={e => setDraft(prev => ({ ...prev, customOffDays: e.target.checked }))} /> {t('Enable custom off-days')}</label><label className="check"><input type="checkbox" checked={draft.requireManualApproval} onChange={e => setDraft(prev => ({ ...prev, requireManualApproval: e.target.checked }))} /> {t('Require approval for Manual Override')}</label><button type="button" className="primary" onClick={() => onSave(draft)}>{t('Save Settings')}</button><div className="settings-security"><h2>{t('Biometric Unlock')}</h2><p className="muted">{t('Use Face ID or Fingerprint to unlock this app on this device.')}</p><button type="button" className="primary" onClick={onToggleBiometric}>{t(biometricEnabled ? 'Disable biometric unlock' : 'Enable biometric unlock')}</button></div></div></div>;
 }
 
 function UserManagement({ users, setUsers, onNotify }: { users: UserRecord[]; setUsers: React.Dispatch<React.SetStateAction<UserRecord[]>>; onNotify: (s: string) => void }) {
