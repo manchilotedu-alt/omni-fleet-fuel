@@ -45,11 +45,11 @@ function userPayload(user: any) {
 }
 
 function normalizePhone(value: unknown): string {
-  let phone = String(value ?? '').replace(/[\\s()-]/g, '');
+  let phone = String(value ?? '').replace(/[\s()-]/g, '');
   if (phone.startsWith('09') && phone.length === 10) phone = '+251' + phone.slice(1);
   else if (phone.startsWith('9') && phone.length === 9) phone = '+251' + phone;
   else if (phone.startsWith('251')) phone = '+' + phone;
-  if (!/^\\+[1-9]\\d{7,14}$/.test(phone)) fail('Enter a valid phone number with country code, or an Ethiopian 09/9 number.');
+  if (!/^\+[1-9]\d{7,14}$/.test(phone)) fail('Enter a valid phone number with country code, or an Ethiopian 09/9 number.');
   return phone;
 }
 
