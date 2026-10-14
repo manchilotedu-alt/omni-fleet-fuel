@@ -36,7 +36,7 @@ import {
 import * as React from 'react';
 
 type Lang = 'en' | 'am';
-type AppUser = { id: string; email: string; name: string };
+type AppUser = { id: string; email: string; name: string; phone?: string };
 
 const translations: Record<string, string> = {
   'Dashboard': 'ዳሽቦርድ',
@@ -199,6 +199,18 @@ const translations: Record<string, string> = {
 
   'Reset Password': 'የይለፍ ቃል ዳግም አዘጋጅ',
   'Phone Number': 'ስልክ ቁጥር',
+  "Father's Full Name": 'የአባት ሙሉ ስም',
+  "Enter your mother's full name": 'የእናትዎን ሙሉ ስም ያስገቡ',
+  "Enter your father's full name": 'የአባትዎን ሙሉ ስም ያስገቡ',
+  'Phone number is required.': 'ስልክ ቁጥር ማስገባት ያስፈልጋል።',
+  'Create an account with your phone number and recovery details.': 'በስልክ ቁጥርና በመልሶ ማግኛ መረጃዎች መለያ ይፍጠሩ።',
+  'Use the phone number registered to this account.': 'በዚህ መለያ የተመዘገበውን ስልክ ቁጥር ይጠቀሙ።',
+  'New Password': 'አዲስ የይለፍ ቃል',
+  'Enter phone, mother name and birth date.': 'ስልክ፣ የእናት ሙሉ ስምና የትውልድ ቀን ያስገቡ።',
+  'The phone number or recovery details could not be verified.': 'የስልክ ቁጥሩ ወይም የማረጋገጫ መረጃዎቹ ሊረጋገጡ አልቻሉም።',
+  'This phone number is already registered.': 'ይህ ስልክ ቁጥር አስቀድሞ ተመዝግቧል።',
+  'Enter a valid phone number with country code, or an Ethiopian 09/9 number.': 'ትክክለኛ ስልክ ቁጥር ያስገቡ።',
+  "Enter your full name and both parents' full names.": 'የራስዎን፣ የእናትዎንና የአባትዎን ሙሉ ስም ያስገቡ።',
   'Plate Number': 'የሰሌዳ ቁጥር',
   'Vehicle Type': 'የተሽከርካሪ ዓይነት',
   'Fuel Type': 'የነዳጅ ዓይነት',
@@ -723,7 +735,7 @@ function AppContent() {
           const { data } = await supabase.auth.getSession();
           if (mounted && data.session?.user) {
             const user = data.session.user;
-            setAuthUser({ id: user.id, email: user.email || '', name: user.user_metadata?.full_name || user.email || 'Fleet Manager' });
+            setAuthUser({ id: user.id, email: user.email || '', phone: user.phone || '', name: user.user_metadata?.full_name || user.phone || user.email || 'Fleet Manager' });
           }
         } catch {}
         return;
@@ -965,7 +977,7 @@ function AppContent() {
           <button className="top-mode-toggle" type="button" onClick={() => setNightMode(v => !v)} aria-label={nightMode ? 'Turn off night mode' : 'Turn on night mode'} title={nightMode ? 'Turn off night mode' : 'Turn on night mode'}>{nightMode ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button className="language-toggle" type="button" onClick={() => setLang(lang === 'en' ? 'am' : 'en')} aria-label={lang === 'en' ? 'Switch to Amharic' : 'Switch to English'} title={lang === 'en' ? 'አማርኛ' : 'English'}>{lang === 'en' ? 'አማ' : 'EN'}</button>
           <button className="icon-btn" onClick={() => notify(t('No new notifications'))}><Bell size={19} /></button>
-          <button className="user-pill" type="button" onClick={() => setShowMenu(v => !v)}>{profilePhoto ? <img className="avatar avatar-image" src={profilePhoto} alt="Profile" /> : <span className="avatar">{authUser?.name?.slice(0, 2).toUpperCase() || 'AD'}</span>}<span className="hide-sm">{authUser?.name || authUser?.email || t('Administrator')}</span><ChevronRight size={16} /></button>
+          <button className="user-pill" type="button" onClick={() => setShowMenu(v => !v)}>{profilePhoto ? <img className="avatar avatar-image" src={profilePhoto} alt="Profile" /> : <span className="avatar">{authUser?.name?.slice(0, 2).toUpperCase() || 'AD'}</span>}<span className="hide-sm">{authUser?.name || authUser?.phone || authUser?.email || t('Administrator')}</span><ChevronRight size={16} /></button>
           {showMenu && <div className="user-menu"><strong>{authUser?.name || t('Administrator')}</strong><small>{t('Fleet Manager')}</small><button type="button" onClick={() => { setShowMenu(false); navigate('Profile'); }}><UserCircle size={15} /> {t('Profile')}</button><button type="button" onClick={() => { setShowMenu(false); navigate('Settings'); }}><Settings size={15} /> {t('Settings')}</button><button type="button" onClick={() => { setShowMenu(false); notify(t('No new notifications')); }}><Bell size={15} /> {t('Notifications')}</button><button type="button" onClick={logout}><LogOut size={15} /> {t('Sign out')}</button></div>}
         </div>
       </header>
@@ -1005,58 +1017,123 @@ function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode; labe
 function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComplete }: { onLogin: (user: AppUser) => void; lang: Lang; setLang: (lang: Lang) => void; initialRecovery?: boolean; onRecoveryComplete: () => void }) {
   const { t } = useLanguage();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [name, setName] = useState(''); const [loginEmail, setLoginEmail] = useState('');
-  const [email, setEmail] = useState(''); const [contact, setContact] = useState('');
-  const [password, setPassword] = useState(''); const [confirm, setConfirm] = useState(''); const [otp, setOtp] = useState(''); const [userId, setUserId] = useState('');
-  const [step, setStep] = useState<'contact' | 'otp' | 'password'>('contact'); const [channel, setChannel] = useState<'email' | 'phone' | ''>('');
-  const [errorMessage, setErrorMessage] = useState(''); const [busy, setBusy] = useState(false); const [resetMode, setResetMode] = useState(false);
-  const [passwordVisible, setPasswordVisible] = useState(false); const [confirmVisible, setConfirmVisible] = useState(false);
-  useEffect(() => { if (initialRecovery) { setResetMode(true); setStep('password'); setErrorMessage(''); } }, [initialRecovery]);
-  const handleError = (error: unknown, fallback: string) => { const e = error as { message?: string; response?: { status?: number; data?: { message?: string; error?: string; detail?: string } | string } }; const data = e.response?.data; let serverMessage = typeof data === 'string' ? data : data?.message || data?.error || data?.detail; if (!serverMessage && e.response?.status === 401 && resetMode) serverMessage = 'The submitted recovery information is incorrect.'; if (!serverMessage && e.response?.status === 401) serverMessage = 'Sign-in was not accepted. Check the phone number and password, then try again. If they are correct, the session could not be verified.'; if (!serverMessage && e.response?.status === 409) serverMessage = 'This phone number is already registered. Please check the number and try again.'; setErrorMessage(serverMessage && translations[serverMessage] ? t(serverMessage) : serverMessage || e.message || fallback); };
-  const requestReset = async () => { setBusy(true); setErrorMessage(''); try { await api.post('/api/auth/request-reset', { email: contact.trim() }); setResetMode(false); setMode('login'); setStep('contact'); setContact(''); setErrorMessage(t('Password reset email sent. Open the link in your email to set a new password.')); } catch (e) { handleError(e, 'Could not send the verification code.'); } finally { setBusy(false); } };
-  const submit = async () => {
-    if (resetMode) {
-      if (step === 'contact') { if (!contact.trim()) { setErrorMessage(t('Email is required.')); return; } await requestReset(); return; }
-      if (password.length < 8 || password !== confirm) { setErrorMessage(password !== confirm ? t('Passwords do not match.') : 'Password must be at least 8 characters.'); return; }
-      setBusy(true); setErrorMessage(''); try { await api.post('/api/auth/reset-password', { recoveryToken: userId, password }); setResetMode(false); setStep('contact'); setContact(''); setOtp(''); setUserId(''); setPassword(''); setConfirm(''); onRecoveryComplete(); setErrorMessage(t('Password reset successfully. Please sign in with your new password.')); } catch (e) { handleError(e, 'Password reset failed.'); } finally { setBusy(false); } return;
-    }
-    if (mode === 'login') {
-      if (!loginEmail.trim()) { setErrorMessage(t('Email is required.')); return; }
-      if (password.length < 8) { setErrorMessage('Password must be at least 8 characters.'); return; }
-    }
-    if (mode === 'signup' && (!name.trim() || !email.trim() || password.length < 8)) { setErrorMessage(!name.trim() ? 'Please enter your full name.' : 'Password must be at least 8 characters.'); return; }
-    if (mode === 'signup') {
-      if (!email.trim()) { setErrorMessage(t('Email is required.')); return; }
-      if (password !== confirm) { setErrorMessage(t('Passwords do not match.')); return; }
-      setBusy(true); setErrorMessage(''); try { const r = await api.post('/api/auth/signup', { name: name.trim(), email: email.trim(), password }); if (r.data.requiresEmailConfirmation) { setMode('login'); setName(''); setPassword(''); setConfirm(''); setErrorMessage(t('Account created. Check your email to confirm your address, then sign in.')); return; } localStorage.setItem('omni_ffm_last_name', r.data.user.name); onLogin(r.data.user); } catch (e) { handleError(e, 'Could not create the account.'); } finally { setBusy(false); } return;
-    }
-    setBusy(true); setErrorMessage(''); try { const r = await api.post('/api/auth/login', { email: loginEmail.trim(), password }); localStorage.setItem('omni_ffm_last_name', r.data.user.name); onLogin(r.data.user); } catch (e) { handleError(e, 'Could not complete the request. Please try again.'); } finally { setBusy(false); }
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [motherName, setMotherName] = useState('');
+  const [fatherName, setFatherName] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [recoveryPhone, setRecoveryPhone] = useState('');
+  const [recoveryMother, setRecoveryMother] = useState('');
+  const [recoveryBirthDate, setRecoveryBirthDate] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+
+  useEffect(() => {
+    if (initialRecovery) { setResetMode(true); setErrorMessage(''); }
+  }, [initialRecovery]);
+
+  const handleError = (error: unknown, fallback: string) => {
+    const e = error as { message?: string; response?: { status?: number; data?: { message?: string; error?: string; detail?: string } | string } };
+    const data = e.response?.data;
+    const serverMessage = typeof data === 'string' ? data : data?.message || data?.error || data?.detail;
+    setErrorMessage(serverMessage && translations[serverMessage] ? t(serverMessage) : serverMessage || e.message || fallback);
   };
-  const verifySignup = async () => {};
-  const verifyResetOtp = async () => {};
-  const switchMode = (next: 'login' | 'signup') => { setResetMode(false); setMode(next); setStep('contact'); setContact(''); setChannel(''); setOtp(''); setUserId(''); setEmail(''); setLoginEmail(''); setPassword(''); setConfirm(''); setErrorMessage(''); };
-  const resetFlow = () => { setResetMode(true); setStep('contact'); setContact(''); setChannel('email'); setOtp(''); setUserId(''); setPassword(''); setConfirm(''); setErrorMessage(''); };
-  const otpActive = step === 'otp'; const passwordActive = resetMode && step === 'password';
+
+  const clearPasswordFields = () => { setPassword(''); setConfirm(''); };
+  const switchMode = (next: 'login' | 'signup') => {
+    setResetMode(false); setMode(next); setName(''); setPhone(''); setMotherName(''); setFatherName(''); setBirthDate('');
+    setRecoveryPhone(''); setRecoveryMother(''); setRecoveryBirthDate(''); clearPasswordFields(); setErrorMessage('');
+  };
+  const resetFlow = () => {
+    setResetMode(true); setRecoveryPhone(phone); setRecoveryMother(''); setRecoveryBirthDate(''); clearPasswordFields(); setErrorMessage('');
+  };
+
+  const submit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    setErrorMessage('');
+    if (resetMode) {
+      if (!recoveryPhone.trim() || !recoveryMother.trim() || !recoveryBirthDate) {
+        setErrorMessage(t('Enter phone, mother name and birth date.'));
+        return;
+      }
+      if (password.length < 8 || password !== confirm) {
+        setErrorMessage(password !== confirm ? t('Passwords do not match.') : t('Password must be at least 8 characters.'));
+        return;
+      }
+      setBusy(true);
+      try {
+        await api.post('/api/auth/recover-password', {
+          phone: recoveryPhone.trim(), motherName: recoveryMother.trim(), birthDate: recoveryBirthDate, password,
+        });
+        setResetMode(false); setMode('login'); setPhone(recoveryPhone.trim()); clearPasswordFields();
+        setRecoveryPhone(''); setRecoveryMother(''); setRecoveryBirthDate('');
+        onRecoveryComplete();
+        setErrorMessage(t('Password reset successfully. Please sign in with your new password.'));
+      } catch (error) {
+        handleError(error, 'Password reset failed.');
+      } finally { setBusy(false); }
+      return;
+    }
+
+    if (!phone.trim()) { setErrorMessage(t('Phone number is required.')); return; }
+    if (password.length < 8) { setErrorMessage(t('Password must be at least 8 characters.')); return; }
+
+    setBusy(true);
+    try {
+      if (mode === 'signup') {
+        if (!name.trim() || !motherName.trim() || !fatherName.trim() || !birthDate) {
+          setErrorMessage(t('Enter all required account information.'));
+          return;
+        }
+        if (password !== confirm) { setErrorMessage(t('Passwords do not match.')); return; }
+        const response = await api.post('/api/auth/signup', {
+          name: name.trim(), phone: phone.trim(), motherName: motherName.trim(), fatherName: fatherName.trim(),
+          birthDate, password, language: lang,
+        });
+        localStorage.setItem('omni_ffm_last_name', response.data.user.name);
+        onLogin(response.data.user);
+      } else {
+        const response = await api.post('/api/auth/login', { phone: phone.trim(), password });
+        localStorage.setItem('omni_ffm_last_name', response.data.user.name);
+        onLogin(response.data.user);
+      }
+    } catch (error) {
+      handleError(error, mode === 'signup' ? 'Could not create the account.' : 'Could not complete the request. Please try again.');
+    } finally { setBusy(false); }
+  };
+
   return <div className="login-page"><div className="login-glow login-glow-one" /><div className="login-glow login-glow-two" /><div className="login-shell"><div className="login-card">
     <div className="login-card-top"><button className="login-circle-btn" type="button" aria-label={t('Back')} onClick={() => window.history.back()}><ChevronLeft size={18} /></button><button className="login-circle-btn" type="button" onClick={() => setLang(lang === 'en' ? 'am' : 'en')}>{lang === 'en' ? 'አማ' : 'EN'}</button></div>
-    <div className="login-logo-ring"><div className="login-logo-core"><Fuel size={28} /></div></div><div className="login-brand"><div className="login-welcome">{resetMode ? t('Reset Password') : mode === 'login' ? t('Welcome Back!') : otpActive ? t('Verify Contact') : t('Create Your Account')}</div><p>{resetMode ? (step === 'contact' ? t('Enter your recovery email.') : step === 'otp' ? t('Enter the 6-digit code') : t('Create a new password')) : mode === 'signup' ? (otpActive ? t('Enter the 6-digit code') : t('Create a secure account with a recovery contact.')) : t('Simple secure access to omni-Fleet')}</p></div>
-    <form className="login-form" onSubmit={e => { e.preventDefault(); if (otpActive && resetMode) verifyResetOtp(); else if (mode === 'signup' && otpActive) verifySignup(); else submit(); }}>
+    <div className="login-logo-ring"><div className="login-logo-core"><Fuel size={28} /></div></div>
+    <div className="login-brand"><div className="login-welcome">{resetMode ? t('Reset Password') : mode === 'login' ? t('Welcome Back!') : t('Create Your Account')}</div><p>{resetMode ? t('Enter phone, mother name and birth date.') : mode === 'signup' ? t('Create an account with your phone number and recovery details.') : t('Sign in to manage fleet fuel scheduling')}</p></div>
+    <form className="login-form" onSubmit={submit}>
       {!resetMode && mode === 'signup' && <>
-        <label className="login-field"><span>{t('Full Name')}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={name} onChange={e => setName(e.target.value.slice(0, 20))} maxLength={20} type="text" placeholder={t('Enter your full name')} autoComplete="name" required /></div></label>
-        <label className="login-field"><span>{t('Email Address')}</span><div className="login-input-shell"><span className="login-input-icon">@</span><input value={email} onChange={e => setEmail(e.target.value.trim())} type="email" placeholder="name@example.com" autoComplete="email" required /></div></label>
-        <label className="login-field"><span>{t('Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={password} onChange={e => setPassword(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete="new-password" minLength={8} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
-        <label className="login-field"><span>{t('Confirm Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={confirm} onChange={e => setConfirm(e.target.value)} type={confirmVisible ? 'text' : 'password'} placeholder={t('Confirm password')} autoComplete="new-password" minLength={8} required /><button className="password-eye" type="button" aria-label={confirmVisible ? t('Hide password') : t('Show password')} onClick={() => setConfirmVisible(v => !v)}>{confirmVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
+        <label className="login-field"><span>{t('Full Name')}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={name} onChange={e => setName(e.target.value)} type="text" placeholder={t('Enter your full name')} autoComplete="name" maxLength={120} required /></div></label>
+        <label className="login-field"><span>{t('Phone Number')}</span><div className="login-input-shell"><span className="login-input-icon"><UserCircle size={16} /></span><input value={phone} onChange={e => setPhone(e.target.value)} type="tel" placeholder="09XXXXXXXX or +2519XXXXXXXX" autoComplete="tel" maxLength={20} required /></div></label>
+        <label className="login-field"><span>{t("Mother's Full Name")}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={motherName} onChange={e => setMotherName(e.target.value)} type="text" placeholder={t("Enter your mother's full name")} autoComplete="off" maxLength={120} required /></div></label>
+        <label className="login-field"><span>{t("Father's Full Name")}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={fatherName} onChange={e => setFatherName(e.target.value)} type="text" placeholder={t("Enter your father's full name")} autoComplete="off" maxLength={120} required /></div></label>
+        <label className="login-field"><span>{t('Birth Date')}</span><div className="login-input-shell"><span className="login-input-icon"><CalendarDays size={16} /></span><input value={birthDate} onChange={e => setBirthDate(e.target.value)} type="date" autoComplete="bday" max={new Date().toISOString().slice(0, 10)} required /></div></label>
       </>}
-      {!resetMode && mode === 'login' && <><label className="login-field"><span>{t('Email Address')}</span><div className="login-input-shell"><span className="login-input-icon">@</span><input value={loginEmail} onChange={e => setLoginEmail(e.target.value.trim())} type="email" placeholder="name@example.com" autoComplete="email" required /></div></label><label className="login-field"><span>{t('Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={password} onChange={e => setPassword(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete="current-password" minLength={8} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label></>}
-      {resetMode && step === 'contact' && <>
-        <label className="login-field"><span>{t('Email Address')}</span><div className="login-input-shell"><span className="login-input-icon">@</span><input value={contact} onChange={e => setContact(e.target.value.trim())} type="email" placeholder="name@example.com" autoComplete="email" required /></div></label>
+      {!resetMode && mode === 'login' && <label className="login-field"><span>{t('Phone Number')}</span><div className="login-input-shell"><span className="login-input-icon"><UserCircle size={16} /></span><input value={phone} onChange={e => setPhone(e.target.value)} type="tel" placeholder="09XXXXXXXX or +2519XXXXXXXX" autoComplete="tel" maxLength={20} required /></div></label>}
+      {resetMode && <>
+        <label className="login-field"><span>{t('Phone Number')}</span><div className="login-input-shell"><span className="login-input-icon"><UserCircle size={16} /></span><input value={recoveryPhone} onChange={e => setRecoveryPhone(e.target.value)} type="tel" placeholder="09XXXXXXXX or +2519XXXXXXXX" autoComplete="tel" maxLength={20} required /></div></label>
+        <label className="login-field"><span>{t("Mother's Full Name")}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={recoveryMother} onChange={e => setRecoveryMother(e.target.value)} type="text" placeholder={t("Enter your mother's full name")} autoComplete="off" maxLength={120} required /></div></label>
+        <label className="login-field"><span>{t('Birth Date')}</span><div className="login-input-shell"><span className="login-input-icon"><CalendarDays size={16} /></span><input value={recoveryBirthDate} onChange={e => setRecoveryBirthDate(e.target.value)} type="date" autoComplete="bday" max={new Date().toISOString().slice(0, 10)} required /></div></label>
       </>}
-      {otpActive && null}
-      {passwordActive && <><label className="login-field"><span>{t('Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={password} onChange={e => setPassword(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete="new-password" minLength={8} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label><label className="login-field"><span>{t('Confirm Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={confirm} onChange={e => setConfirm(e.target.value)} type={confirmVisible ? 'text' : 'password'} placeholder={t('Confirm password')} autoComplete="new-password" minLength={8} required /><button className="password-eye" type="button" aria-label={confirmVisible ? t('Hide password') : t('Show password')} onClick={() => setConfirmVisible(v => !v)}>{confirmVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label></>}
-      <div className="login-options">{!resetMode && mode === 'login' && <span className="login-create-label">{t('Use the email address registered to this account.')}</span>}{!resetMode && mode === 'login' && <button className="login-link" type="button" disabled={busy} onClick={resetFlow}>{t('Forgot Password?')}</button>}</div>
-      <button className="login-btn" type="submit" disabled={busy || (otpActive ? otp.length !== 6 : resetMode && step === 'contact' ? !contact.trim() : passwordActive ? password.length < 8 || confirm.length < 8 : mode === 'login' ? !loginEmail.trim() || password.length < 8 : !name.trim() || !email.trim() || password.length < 8 || !confirm)}><span>{busy ? t('Checking...') : otpActive ? t('Verify') : passwordActive ? t('Reset Password') : resetMode ? t('Verify & Continue') : mode === 'login' ? t('Sign In') : t('Create Account')}</span><ChevronRight size={18} /></button>
-      {errorMessage && <div className="login-error">{errorMessage}</div>}<div className="login-create"><span>{resetMode ? t('Remembered your password?') : mode === 'login' ? t('Create Your Account?') : t('Already have an account?')}</span><button type="button" className="login-link strong" onClick={() => switchMode(resetMode ? 'login' : mode === 'login' ? 'signup' : 'login')}>{resetMode ? t('Sign In') : mode === 'login' ? t('Sign up') : t('Sign In')}</button></div>
-    </form><div className="login-secure-note"><CheckCircle2 size={15} /><span>{t('Your account information is stored securely by the app server.')}</span></div><div className="login-language login-language-bottom"><button className={lang === 'am' ? 'selected-language' : ''} onClick={() => setLang('am')}>አማርኛ</button><span>·</span><button className={lang === 'en' ? 'selected-language' : ''} onClick={() => setLang('en')}>English</button></div>
+      {!resetMode && <label className="login-field"><span>{t('Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={password} onChange={e => setPassword(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={8} maxLength={128} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>}
+      {(resetMode || mode === 'signup') && <><label className="login-field"><span>{resetMode ? t('New Password') : t('Confirm Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={resetMode ? password : confirm} onChange={e => resetMode ? setPassword(e.target.value) : setConfirm(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete="new-password" minLength={8} maxLength={128} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>{resetMode && <label className="login-field"><span>{t('Confirm Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={confirm} onChange={e => setConfirm(e.target.value)} type={confirmVisible ? 'text' : 'password'} placeholder={t('Confirm password')} autoComplete="new-password" minLength={8} maxLength={128} required /><button className="password-eye" type="button" aria-label={confirmVisible ? t('Hide password') : t('Show password')} onClick={() => setConfirmVisible(v => !v)}>{confirmVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>}</>}
+      <div className="login-options">{!resetMode && mode === 'login' && <span className="login-create-label">{t('Use the phone number registered to this account.')}</span>}{!resetMode && mode === 'login' && <button className="login-link" type="button" disabled={busy} onClick={resetFlow}>{t('Forgot Password?')}</button>}</div>
+      <button className="login-btn" type="submit" disabled={busy || (!resetMode && !phone.trim()) || (resetMode && (!recoveryPhone.trim() || !recoveryMother.trim() || !recoveryBirthDate || password.length < 8 || confirm.length < 8)) || (!resetMode && password.length < 8) || (mode === 'signup' && (!name.trim() || !motherName.trim() || !fatherName.trim() || !birthDate || !confirm || password !== confirm))}><span>{busy ? t('Checking...') : resetMode ? t('Reset Password') : mode === 'login' ? t('Sign In') : t('Create Account')}</span><ChevronRight size={18} /></button>
+      {errorMessage && <div className="login-error">{errorMessage}</div>}
+      <div className="login-create"><span>{resetMode ? t('Remembered your password?') : mode === 'login' ? t('Create Your Account?') : t('Already have an account?')}</span><button type="button" className="login-link strong" onClick={() => resetMode ? switchMode('login') : switchMode(mode === 'login' ? 'signup' : 'login')}>{resetMode ? t('Sign In') : mode === 'login' ? t('Sign up') : t('Sign In')}</button></div>
+    </form>
+    <div className="login-secure-note"><CheckCircle2 size={15} /><span>{t('Your account information is stored securely by the app server.')}</span></div>
+    <div className="login-language login-language-bottom"><button className={lang === 'am' ? 'selected-language' : ''} onClick={() => setLang('am')}>አማርኛ</button><span>·</span><button className={lang === 'en' ? 'selected-language' : ''} onClick={() => setLang('en')}>English</button></div>
   </div><div className="login-brand-mark"><span className="login-brand-dot"><Fuel size={16} /></span><strong>omni-Fleet</strong></div></div></div>;
 }
 
@@ -1433,7 +1510,7 @@ function ProfilePage({ user, photo, onPhotoChange, onNavigate, onNotify }: { use
     reader.onload = () => onPhotoChange(String(reader.result || ''));
     reader.readAsDataURL(file);
   };
-  return <div className="content"><button type="button" className="back-btn profile-back-btn" onClick={() => onNavigate('Dashboard')}><ChevronLeft size={19} /> {t('Home')}</button><div className="profile-card"><div className="profile-cover"><div className="profile-avatar-wrap">{photo ? <img className="profile-avatar" src={photo} alt="Profile" /> : <div className="profile-avatar profile-avatar-placeholder"><UserCircle size={52} /></div>}<button type="button" className="profile-camera" onClick={() => inputRef.current?.click()}><Edit3 size={14} /></button></div></div><div className="profile-body"><h2>{user?.name || t('Administrator')}</h2><p>{user?.email || t('Fleet Manager')}</p><input ref={inputRef} hidden type="file" accept="image/*" onChange={e => choosePhoto(e.target.files?.[0])} /><div className="profile-actions"><button type="button" className="primary" onClick={() => inputRef.current?.click()}><Edit3 size={16} /> {t('Change photo')}</button>{photo && <button type="button" className="outline" onClick={() => onPhotoChange('')}>{t('Remove photo')}</button>}<button type="button" className="outline" onClick={() => onNavigate('Settings')}><Settings size={16} /> {t('Settings')}</button></div><div className="profile-info-grid"><div><span>{t('Full Name')}</span><strong>{user?.name || '—'}</strong></div><div><span>{t('Email')}</span><strong>{user?.email || '—'}</strong></div><div><span>{t('Account')}</span><strong>{t('Active')}</strong></div></div></div></div></div>;
+  return <div className="content"><button type="button" className="back-btn profile-back-btn" onClick={() => onNavigate('Dashboard')}><ChevronLeft size={19} /> {t('Home')}</button><div className="profile-card"><div className="profile-cover"><div className="profile-avatar-wrap">{photo ? <img className="profile-avatar" src={photo} alt="Profile" /> : <div className="profile-avatar profile-avatar-placeholder"><UserCircle size={52} /></div>}<button type="button" className="profile-camera" onClick={() => inputRef.current?.click()}><Edit3 size={14} /></button></div></div><div className="profile-body"><h2>{user?.name || t('Administrator')}</h2><p>{user?.phone || user?.email || t('Fleet Manager')}</p><input ref={inputRef} hidden type="file" accept="image/*" onChange={e => choosePhoto(e.target.files?.[0])} /><div className="profile-actions"><button type="button" className="primary" onClick={() => inputRef.current?.click()}><Edit3 size={16} /> {t('Change photo')}</button>{photo && <button type="button" className="outline" onClick={() => onPhotoChange('')}>{t('Remove photo')}</button>}<button type="button" className="outline" onClick={() => onNavigate('Settings')}><Settings size={16} /> {t('Settings')}</button></div><div className="profile-info-grid"><div><span>{t('Full Name')}</span><strong>{user?.name || '—'}</strong></div><div><span>{t('Phone Number')}</span><strong>{user?.phone || '—'}</strong></div><div><span>{t('Account')}</span><strong>{t('Active')}</strong></div></div></div></div></div>;
 }
 
 function SettingsPage({ settings, onSave }: { settings: AppSettings; onSave: (settings: AppSettings) => void }) {
