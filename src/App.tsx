@@ -755,7 +755,7 @@ function AppContent() {
         } catch {}
         return;
       }
-      if (!sessionOpen && localStorage.getItem('omni_ffm_biometric_enabled') === '1') {
+      if (localStorage.getItem('omni_ffm_biometric_enabled') === '1') {
         try {
           if (!Capacitor.isNativePlatform()) throw new Error('Biometric authentication is available only in the installed mobile app.');
           const available = await Biometrics.isAvailable();
