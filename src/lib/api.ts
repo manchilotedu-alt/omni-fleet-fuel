@@ -127,6 +127,7 @@ export const api = {
       const created = await invokeAccountAuth({
         action: 'signup',
         phone: body.phone,
+        password: String(body.password || ''),
         fullName: String(body.name || '').trim(),
         motherName: String(body.motherName || '').trim(),
         fatherName: String(body.fatherName || '').trim(),
