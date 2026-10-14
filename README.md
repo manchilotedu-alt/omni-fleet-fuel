@@ -33,7 +33,7 @@
 
 ## Important
 
-The source snapshot is **not yet ready to deploy outside AppDeploy**. The frontend calls `/api/auth/*` and `/api/fleet-data`; the backend currently imports `@appdeploy/sdk`. Those routes and data services must be migrated before the Android/mobile build can be considered complete.
+This branch is still a validation build, not a production release. The Android APK must pass the latest build and real-device tests before release. The User Management screen is not yet connected to real Supabase Auth accounts and organization memberships, and password-recovery requests still need an in-app administrator queue. Keep the original AppDeploy version untouched until the replacement passes testing.
 
 ## Source branch
 
