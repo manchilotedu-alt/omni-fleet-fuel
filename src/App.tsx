@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from './lib/api';
 import { Capacitor } from '@capacitor/core';
-import BiometricAuth from '@aparajita/capacitor-biometric-auth';
+import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
 import { supabase } from './lib/supabase';
 import {
   AlertTriangle,
