@@ -60,6 +60,75 @@ Deno.serve(async (req: Request) => {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return reply(400, { error: "Invalid request." }); }
   const action = String(body.action ?? "");
+
+  // Administrative recovery actions are authenticated with the caller's Supabase access token.
+  // The service-role client is used only after the caller is verified and scoped to their own organization.
+  if (action === "admin-recovery-list" || action === "admin-recovery-resolve") {
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const authorization = req.headers.get("Authorization") || "";
+    const accessToken = authorization.replace(/^Bearer\\s+/i, "").trim();
+    if (!anonKey || !accessToken) return reply(401, { error: "Please sign in as an organization administrator." });
+    const callerClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: callerData, error: callerError } = await callerClient.auth.getUser(accessToken);
+    if (callerError || !callerData.user) return reply(401, { error: "Your session is invalid. Please sign in again." });
+    const { data: adminMembership, error: membershipError } = await admin
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", callerData.user.id)
+      .eq("role", "admin")
+      .limit(1)
+      .maybeSingle();
+    if (membershipError || !adminMembership?.organization_id) return reply(403, { error: "Only an organization administrator can manage recovery requests." });
+
+    const { data: members, error: membersError } = await admin
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", adminMembership.organization_id);
+    if (membersError) return reply(500, { error: "Could not load organization members." });
+    const memberIds = (members || []).map((member: { user_id: string }) => member.user_id);
+    if (action === "admin-recovery-list") {
+      if (!memberIds.length) return reply(200, { requests: [] });
+      const { data: requests, error: requestsError } = await admin
+        .from("account_recovery_requests")
+        .select("id,user_id,phone,status,created_at")
+        .in("user_id", memberIds)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (requestsError) return reply(500, { error: "Could not load recovery requests." });
+      const userIds = [...new Set((requests || []).map((request: { user_id: string }) => request.user_id))];
+      const { data: profiles } = userIds.length
+        ? await admin.from("profiles").select("id,full_name").in("id", userIds)
+        : { data: [] as { id: string; full_name: string }[] };
+      const names = new Map((profiles || []).map((profile: { id: string; full_name: string }) => [profile.id, profile.full_name]));
+      return reply(200, { requests: (requests || []).map((request: Record<string, unknown>) => ({ ...request, full_name: names.get(String(request.user_id)) || "Fleet user" })) });
+    }
+
+    const requestId = String(body.requestId || "");
+    const newPassword = String(body.newPassword || "");
+    if (!/^[0-9a-f-]{36}$/i.test(requestId)) return reply(400, { error: "Select a valid recovery request." });
+    if (newPassword.length < 8 || newPassword.length > 128) return reply(400, { error: "The new password must be 8–128 characters." });
+    const { data: recoveryRequest, error: recoveryError } = await admin
+      .from("account_recovery_requests")
+      .select("id,user_id,status")
+      .eq("id", requestId)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (recoveryError || !recoveryRequest) return reply(404, { error: "This request is no longer pending." });
+    if (!memberIds.includes(recoveryRequest.user_id)) return reply(403, { error: "This request is outside your organization." });
+    const { error: passwordError } = await admin.auth.admin.updateUserById(recoveryRequest.user_id, { password: newPassword });
+    if (passwordError) return reply(400, { error: "The password could not be reset. Please try again." });
+    const { error: updateError } = await admin.from("account_recovery_requests").update({
+      status: "approved",
+      resolved_at: new Date().toISOString(),
+      resolved_by: callerData.user.id,
+    }).eq("id", requestId).eq("status", "pending");
+    if (updateError) return reply(500, { error: "The password was reset, but the request status could not be updated. Please contact support." });
+    return reply(200, { ok: true, message: "Password reset completed. Tell the user to sign in with the new password." });
+  }
+
   let phone = "";
   try { phone = normalizePhone(body.phone); } catch { return reply(400, { error: "Enter a valid phone number with country code, or an Ethiopian 09/9 number." }); }
 
