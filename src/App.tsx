@@ -20,6 +20,7 @@ import {
   Gauge,
   History,
   LayoutDashboard,
+  KeyRound,
   House,
   LogOut,
   MoreVertical,
@@ -116,6 +117,14 @@ const translations: Record<string, string> = {
   'Please choose an image file.': 'እባክዎ የምስል ፋይል ይምረጡ።',
   'Photo must be 2 MB or smaller.': 'ፎቶው 2 MB ወይም ከዚያ በታች መሆን አለበት።',
   'User Management': 'የተጠቃሚዎች አስተዳደር',
+  'Recovery Requests': 'የመለያ መመለሻ ጥያቄዎች',
+  'Pending recovery requests': 'በመጠባበቅ ላይ ያሉ የመለያ መመለሻ ጥያቄዎች',
+  'Refresh': 'አድስ',
+  'New password for this user': 'ለዚህ ተጠቃሚ አዲስ የይለፍ ቃል',
+  'Reset password': 'የይለፍ ቃል ቀይር',
+  'No recovery requests found.': 'የመለያ መመለሻ ጥያቄ አልተገኘም።',
+  'Password reset completed. Tell the user to sign in with the new password.': 'የይለፍ ቃሉ ተቀይሯል። ተጠቃሚው በአዲሱ የይለፍ ቃል እንዲገባ ያሳውቁት።',
+  'Only an organization administrator can manage recovery requests.': 'የመለያ መመለሻ ጥያቄዎችን ማስተዳደር የሚችለው የድርጅቱ አስተዳዳሪ ብቻ ነው።',
   'Add Vehicle': 'ተሽከርካሪ ጨምር',
   'Manual Override': 'በእጅ ማስተካከያ',
   'Early Fill': 'ነዳጅ ሙላ',
@@ -1040,6 +1049,7 @@ function AppContent() {
     Reports: <><MonthlyFinanceBoard states={states} offDays={offDays} fuel={fuel} settings={settings} onSelect={v => { setSelected(v); navigate('Vehicle Details'); }} /><MonthlyReport fuel={fuel} states={states} onSelect={v => { setSelected(v); navigate('Vehicle Details'); }} /></>,
     Settings: <SettingsPage settings={settings} onSave={next => { setSettings(next); notify('Settings saved'); }} biometricEnabled={biometricEnabled} onToggleBiometric={toggleBiometric} />,
     'User Management': <UserManagement users={users} setUsers={setUsers} onNotify={notify} />,
+    'Recovery Requests': <RecoveryRequestsPage onNotify={notify} />,
     Profile: <ProfilePage user={authUser} photo={profilePhoto} onPhotoChange={setProfilePhoto} onNavigate={navigate} onNotify={notify} />,
   };
 
@@ -1067,6 +1077,7 @@ function AppContent() {
         <NavItem icon={<UserCircle />} label={t('Profile')} active={active === 'Profile'} onClick={() => navigate('Profile')} />
         <NavItem icon={<Settings />} label={t('Settings')} active={active === 'Settings'} onClick={() => navigate('Settings')} />
         <NavItem icon={<UserCog />} label={t('User Management')} active={active === 'User Management'} onClick={() => navigate('User Management')} />
+        <NavItem icon={<KeyRound />} label={t('Recovery Requests')} active={active === 'Recovery Requests'} onClick={() => navigate('Recovery Requests')} />
       </aside>
       <main className="main">
         <div className="page-head"><div><div className="crumb">omni-Fleet <span>/</span> {t(active === 'Dashboard' ? 'Home' : active)}</div><h1>{t(active === 'Dashboard' ? 'Home' : active)}</h1></div><div className="head-actions">{active === 'Vehicle List' && <button className="primary" onClick={() => navigate('Add Vehicle')}><Plus size={17} /> Add Vehicle</button>}{active === 'Dashboard' && <button className="outline" onClick={() => navigate('Reports')}><FileText size={16} /> {t('View Report')}</button>}</div></div>
@@ -1591,6 +1602,79 @@ function SettingsPage({ settings, onSave, biometricEnabled, onToggleBiometric }:
   const [draft, setDraft] = useState<AppSettings>(settings);
   useEffect(() => setDraft(settings), [settings]);
   return <div className="content"><div className="settings-card"><h2>{t('Fuel Scheduling Rules')}</h2><p className="muted">{t('The system uses management-supplied data. Sundays are excluded by default and vehicle-specific off-days can be registered.')}</p><SelectField label="Default Currency" value={draft.currency} onChange={value => setDraft(prev => ({ ...prev, currency: value as AppSettings['currency'] }))} options={['ETB (Birr)', 'USD']} /><label className="check"><input type="checkbox" checked={draft.sundayOff} onChange={e => setDraft(prev => ({ ...prev, sundayOff: e.target.checked }))} /> {t('Sunday as Off-Day (default)')}</label><label className="check"><input type="checkbox" checked={draft.customOffDays} onChange={e => setDraft(prev => ({ ...prev, customOffDays: e.target.checked }))} /> {t('Enable custom off-days')}</label><label className="check"><input type="checkbox" checked={draft.requireManualApproval} onChange={e => setDraft(prev => ({ ...prev, requireManualApproval: e.target.checked }))} /> {t('Require approval for Manual Override')}</label><button type="button" className="primary" onClick={() => onSave(draft)}>{t('Save Settings')}</button><div className="settings-security"><h2>{t('Biometric Unlock')}</h2><p className="muted">{t('Use Face ID or Fingerprint to unlock this app on this device.')}</p><button type="button" className="primary" onClick={onToggleBiometric}>{t(biometricEnabled ? 'Disable biometric unlock' : 'Enable biometric unlock')}</button></div></div></div>;
+}
+
+type RecoveryRequest = {
+  id: string;
+  user_id: string;
+  phone: string;
+  full_name: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+};
+
+function RecoveryRequestsPage({ onNotify }: { onNotify: (message: string) => void }) {
+  const { t } = useLanguage();
+  const [requests, setRequests] = useState<RecoveryRequest[]>([]);
+  const [passwords, setPasswords] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  const loadRequests = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get('/api/admin/recovery-requests');
+      setRequests((response.data.requests || []) as RecoveryRequest[]);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || t('Could not load recovery requests.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void loadRequests(); }, []);
+
+  const resetPassword = async (request: RecoveryRequest) => {
+    const newPassword = passwords[request.id] || '';
+    if (newPassword.length < 8) {
+      setError(t('The new password must be 8–128 characters.'));
+      return;
+    }
+    setSavingId(request.id);
+    setError('');
+    try {
+      const response = await api.post('/api/admin/recovery-requests/resolve', { requestId: request.id, newPassword });
+      setPasswords(previous => ({ ...previous, [request.id]: '' }));
+      onNotify(response.data.message || t('Password reset completed. Tell the user to sign in with the new password.'));
+      await loadRequests();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || t('Could not reset the password.'));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return <div className="content">
+    <div className="filterbar">
+      <div><h2 className="plain-title">{t('Pending recovery requests')}</h2><span className="muted">{t('Only requests from users in your organization are shown.')}</span></div>
+      <button type="button" className="outline" onClick={() => void loadRequests()} disabled={loading}><History size={16} /> {t('Refresh')}</button>
+    </div>
+    {error && <div className="notice notice-error" role="alert">{error}</div>}
+    {loading ? <div className="settings-card"><p>{t('Checking secure session...')}</p></div> : requests.length === 0 ? <div className="settings-card"><p>{t('No recovery requests found.')}</p></div> :
+      <div className="table-card"><table><thead><tr><th>{t('Name')}</th><th>{t('Phone Number')}</th><th>{t('Requested')}</th><th>{t('Status')}</th><th>{t('Administrator action')}</th></tr></thead>
+        <tbody>{requests.map(request => <tr key={request.id}>
+          <td><strong>{request.full_name}</strong></td>
+          <td>{request.phone}</td>
+          <td>{new Date(request.created_at).toLocaleString()}</td>
+          <td><span className="status-pill">{t(request.status)}</span></td>
+          <td>{request.status === 'pending' ? <div className="recovery-action">
+            <input aria-label={t('New password for this user')} type="password" autoComplete="new-password" minLength={8} maxLength={128} placeholder={t('New password for this user')} value={passwords[request.id] || ''} onChange={event => setPasswords(previous => ({ ...previous, [request.id]: event.target.value }))} />
+            <button type="button" className="primary" disabled={savingId === request.id || (passwords[request.id] || '').length < 8} onClick={() => void resetPassword(request)}>{savingId === request.id ? t('Checking...') : t('Reset password')}</button>
+          </div> : '—'}</td>
+        </tr>)}</tbody></table></div>}
+  </div>;
 }
 
 function UserManagement({ users, setUsers, onNotify }: { users: UserRecord[]; setUsers: React.Dispatch<React.SetStateAction<UserRecord[]>>; onNotify: (s: string) => void }) {
