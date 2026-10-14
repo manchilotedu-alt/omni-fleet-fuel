@@ -171,7 +171,7 @@ Deno.serve(async (req: Request) => {
       return reply(500, { error: "Could not send the reset request. Please try again." });
     }
     await record(true);
-    return reply(200, { ok: true, message: "Your reset request was sent to the administrator. Contact the administrator to complete the reset." });
+    return reply(200, { ok: true, message: "Your reset request has been recorded. Contact the administrator to complete the reset." });
   }
 
   await record(false);
