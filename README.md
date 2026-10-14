@@ -1,25 +1,32 @@
 # Omni-Fleet Fuel Monitoring
 
-This repository is the source-code home for the Omni-Fleet Fuel Monitoring application.
+**Product requirement: mobile app only.** The primary experience is Android/mobile-first; desktop web is not a target UI. Any hosted deployment is for mobile app delivery/testing or backend APIs, not a separate desktop product.
 
 ## Migration status
 
-- [x] Create repository documentation.
-- [x] Import and verify the current AppDeploy source snapshot on the `migration/appdeploy-source` branch.
-- [ ] Replace AppDeploy-specific frontend and backend SDK dependencies.
-- [ ] Migrate authentication, sessions, OTP/recovery, and fleet persistence to Supabase.
-- [ ] Add organization-scoped data access and row-level security.
-- [ ] Configure Vercel environment variables and deploy a test version.
+- [x] Create separate Supabase project: `omni-fleet-fuel` (`mmgnyumsotudcbilvqep`).
+- [x] Create core tables for organizations, profiles, memberships, vehicles, fuel events, off-days, settings, and audit logs.
+- [x] Enable row-level security and role-based organization access policies.
+- [x] Ensure new Supabase Auth signups receive a new empty organization workspace; no demo fleet records are inserted.
+- [x] Import and verify the current AppDeploy source snapshot on `migration/appdeploy-source`.
+- [ ] Replace AppDeploy-specific frontend and backend SDK dependencies with Supabase Auth/data access.
+- [ ] Build and test the Android/mobile app shell and mobile-only responsive layouts.
+- [ ] Migrate OTP/recovery and role management securely.
+- [ ] Configure Vercel environment variables for mobile testing/API hosting, without touching Omni-dirsha.
 - [ ] Verify working-day/fuel calculations, calendar, reports, Excel export, and Amharic/English.
 - [ ] Keep the original AppDeploy version untouched until the replacement passes testing.
 
+## Backend
+
+- Supabase URL: `https://mmgnyumsotudcbilvqep.supabase.co`
+- Supabase project ref: `mmgnyumsotudcbilvqep`
+- Region: `eu-central-1` (Frankfurt)
+- Each organization’s users, vehicles, fuel events, off-days, settings, and audit logs are isolated by organization ID and RLS.
+- Never put a Supabase service-role key in mobile app code. Only the publishable/anon key may be used client-side with RLS enabled.
+
 ## Important
 
-The source snapshot is **not yet ready to deploy outside AppDeploy**. The frontend calls `/api/auth/*` and `/api/fleet-data`; the backend currently imports `@appdeploy/sdk`. Those routes and data services must be migrated before the Vercel build can be considered complete.
-
-## Data isolation goal
-
-Each organization must have isolated users, vehicles, drivers, working-day records, fuel events, settings, and reports, enforced by Supabase Auth and row-level security.
+The source snapshot is **not yet ready to deploy outside AppDeploy**. The frontend calls `/api/auth/*` and `/api/fleet-data`; the backend currently imports `@appdeploy/sdk`. Those routes and data services must be migrated before the Android/mobile build can be considered complete.
 
 ## Source branch
 
