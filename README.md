@@ -15,7 +15,8 @@
 - [x] Add Capacitor Android configuration and an automated APK build workflow.
 - [ ] Complete Android APK build verification and test the app on a real Android phone.
 - [x] Implement Supabase phone OTP signup/recovery flow in the mobile frontend.
-- [ ] Verify OTP delivery and role-management behavior after SMS provider setup.
+- [ ] Verify OTP delivery after SMS provider setup.
+- [ ] Connect the User Management screen to real Supabase Auth invitations and organization memberships; its current list is still app-state data, not actual login accounts.
 - [ ] Configure Vercel environment variables for mobile testing/API hosting, without touching Omni-dirsha.
 - [ ] Verify working-day/fuel calculations, calendar, reports, Excel export, and Amharic/English.
 - [ ] Keep the original AppDeploy version untouched until the replacement passes testing.
