@@ -174,7 +174,12 @@ Deno.serve(async (req: Request) => {
       return reply(200, { ok: true });
     }
     const loginEmail = loginEmailForPhone(phone);
-    if (authUser.email !== loginEmail) {
+    // Never overwrite a real email address; migrate only legacy phone-only users.
+    if (authUser.email && authUser.email !== loginEmail) {
+      await record(false);
+      return reply(200, { ok: true });
+    }
+    if (!authUser.email) {
       const { error: updateError } = await admin.auth.admin.updateUserById(authUser.id, {
         email: loginEmail,
         email_confirm: true,
