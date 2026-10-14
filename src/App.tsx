@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from './lib/api';
 import { Capacitor } from '@capacitor/core';
-import { Biometrics } from '@capawesome-team/capacitor-biometrics';
+import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
 import { supabase } from './lib/supabase';
 import {
   AlertTriangle,
@@ -758,15 +758,16 @@ function AppContent() {
       if (localStorage.getItem('omni_ffm_biometric_enabled') === '1') {
         try {
           if (!Capacitor.isNativePlatform()) throw new Error('Biometric authentication is available only in the installed mobile app.');
-          const available = await Biometrics.isAvailable();
-          const enrolled = await Biometrics.isEnrolled();
-          if (!available.isAvailable || !enrolled.isEnrolled) throw new Error('Set up Face ID or fingerprint on your device first.');
-          await Biometrics.authenticate({
-            title: 'Unlock Omni Fleet Fuel',
-            subtitle: 'Verify it is you to continue',
-            cancelButtonText: 'Use password',
-            iosFallbackButtonText: 'Use passcode',
+          const biometry = await BiometricAuth.checkBiometry();
+          if (!biometry.isAvailable) throw new Error('Set up Face ID or fingerprint on your device first.');
+          await BiometricAuth.authenticate({
+            reason: 'Verify it is you to unlock Omni Fleet Fuel',
+            cancelTitle: 'Use password',
+            iosFallbackTitle: 'Use passcode',
+            androidTitle: 'Unlock Omni Fleet Fuel',
+            androidSubtitle: 'Verify it is you to continue',
             allowDeviceCredential: true,
+            androidConfirmationRequired: false,
           });
           const response = await api.get('/api/auth/me');
           const user = response.data.user as AppUser;
@@ -914,18 +915,19 @@ function AppContent() {
       return;
     }
     try {
-      const available = await Biometrics.isAvailable();
-      const enrolled = await Biometrics.isEnrolled();
-      if (!available.isAvailable || !enrolled.isEnrolled) {
+      const biometry = await BiometricAuth.checkBiometry();
+      if (!biometry.isAvailable) {
         notify('Set up Face ID or fingerprint on your device first.');
         return;
       }
-      await Biometrics.authenticate({
-        title: 'Enable biometric unlock',
-        subtitle: 'Confirm your identity to enable quick unlock',
-        cancelButtonText: 'Cancel',
-        iosFallbackButtonText: 'Use passcode',
+      await BiometricAuth.authenticate({
+        reason: 'Confirm your identity to enable quick unlock',
+        cancelTitle: 'Cancel',
+        iosFallbackTitle: 'Use passcode',
+        androidTitle: 'Enable biometric unlock',
+        androidSubtitle: 'Confirm your identity to enable quick unlock',
         allowDeviceCredential: true,
+        androidConfirmationRequired: false,
       });
       localStorage.setItem('omni_ffm_biometric_enabled', '1');
       setBiometricEnabled(true);
