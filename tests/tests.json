@@ -1,0 +1,262 @@
+[
+  {
+    "name": "Login uses phone and password",
+    "sanity": true,
+    "viewport": "mobile",
+    "covers": [
+      "phone login",
+      "password login"
+    ],
+    "description": "Verifies the primary sign-in workflow remains available.",
+    "steps": [
+      "Open login",
+      "Enter a registered phone number",
+      "Enter the password",
+      "Tap Sign In"
+    ],
+    "expected": "The user reaches the dashboard after successful sign-in."
+  },
+  {
+    "name": "Account data is private and persists",
+    "viewport": "desktop",
+    "covers": [
+      "account-specific fleet data",
+      "private data isolation",
+      "server persistence",
+      "vehicle setup"
+    ],
+    "description": "Verifies each signed-in account loads only its own fleet records and that its data remains after refresh.",
+    "steps": [
+      "Sign in as Account A and add a vehicle",
+      "Sign out",
+      "Sign in as a new Account B",
+      "Open Vehicle List",
+      "Sign out and sign back in as Account A",
+      "Open Vehicle List"
+    ],
+    "expected": "Account B starts with no vehicles from Account A; Account A still sees its vehicle after signing back in."
+  },
+  {
+    "name": "Ethiopian calendar works in Amharic",
+    "viewport": "mobile",
+    "covers": [
+      "Ethiopian date picker",
+      "Ethiopian month navigation",
+      "Working Calendar",
+      "off-day selection"
+    ],
+    "description": "Verifies Amharic date fields and the Working Calendar use Ethiopian months, days, navigation, and date conversion.",
+    "steps": [
+      "Switch the app to Amharic",
+      "Open a date field",
+      "Move between Ethiopian months",
+      "Open Working Calendar",
+      "Tap an Ethiopian day",
+      "Save the selected off-day"
+    ],
+    "expected": "The selected date is displayed in Ethiopian format and the off-day is saved for the selected vehicle."
+  },
+  {
+    "name": "Monthly Excel export is one row per vehicle",
+    "viewport": "desktop",
+    "covers": [
+      "monthly report",
+      "Excel summary export",
+      "no duplicate vehicle rows",
+      "fuel total aggregation"
+    ],
+    "description": "Verifies the Excel export summarizes each vehicle once with name, plate, cycle, fill count, total birr, and filled-day count.",
+    "steps": [
+      "Enter multiple fuel records for one vehicle in the same month",
+      "Open Reports",
+      "Select Monthly",
+      "Export Excel"
+    ],
+    "expected": "The Excel file contains one summary row per vehicle with aggregated fuel count and birr total instead of repeating the same vehicle for every fuel event."
+  },
+  {
+    "name": "Settings persist and affect scheduling",
+    "viewport": "desktop",
+    "covers": [
+      "settings persistence",
+      "Sunday scheduling rule",
+      "custom off-day rule"
+    ],
+    "description": "Verifies scheduling settings can be changed, saved, and retained.",
+    "steps": [
+      "Open Settings",
+      "Change scheduling options",
+      "Save Settings",
+      "Reopen Settings"
+    ],
+    "expected": "The selected settings remain enabled or disabled as saved."
+  },
+  {
+    "name": "Sign-in 401 shows an actionable message",
+    "viewport": "mobile",
+    "covers": [
+      "HTTP 401 authentication error handling",
+      "readable sign-in feedback"
+    ],
+    "description": "Verifies failed sign-in explains that the phone and password should be checked rather than exposing a raw HTTP status.",
+    "qa_faults": [
+      {
+        "method": "POST",
+        "path": "/api/auth/login",
+        "status": 401,
+        "body_json": {
+          "error": "Unauthorized"
+        }
+      }
+    ],
+    "steps": [
+      "Open Sign In",
+      "Enter a phone number and password",
+      "Submit while the login request returns 401"
+    ],
+    "expected": "A readable sign-in message appears and the raw 'Request failed with status code 401' text is not shown."
+  },
+  {
+    "name": "Signup duplicate conflict shows a helpful message",
+    "viewport": "mobile",
+    "covers": [
+      "signup error handling",
+      "HTTP 409 conflict response"
+    ],
+    "description": "Verifies a duplicate-phone conflict is shown as a useful message instead of a raw request status code.",
+    "qa_faults": [
+      {
+        "method": "POST",
+        "path": "/api/auth/signup",
+        "status": 409,
+        "body_json": {
+          "message": "This phone number is already registered. Please check the number and try again."
+        }
+      }
+    ],
+    "steps": [
+      "Open Create Account",
+      "Enter valid required account details",
+      "Submit the signup form while the signup request returns a 409 conflict"
+    ],
+    "expected": "A readable duplicate-phone message appears instead of 'Request failed with status code 409'."
+  },
+  {
+    "name": "Fuel cycle counts the start date as working day one",
+    "viewport": "mobile",
+    "covers": [
+      "inclusive fuel cycle working-day calculation",
+      "expected fuel date calculation"
+    ],
+    "description": "Verifies a vehicle whose cycle start date is today begins at working day one, rather than incorrectly showing zero or an unrelated elapsed-day count.",
+    "steps": [
+      "Sign in and add a vehicle with today's date as Last Filled Date",
+      "Set Fuel Cycle to 8 working days",
+      "Open Vehicle List and review the working-day count and expected fuel date"
+    ],
+    "expected": "The vehicle shows 1 working day on the start date, and its expected fuel date is calculated with that date counted as day one, excluding configured off-days."
+  },
+  {
+    "name": "Existing fuel-cycle progress can be entered manually",
+    "viewport": "mobile",
+    "covers": [
+      "manual current-cycle progress during vehicle registration",
+      "existing fleet onboarding",
+      "automatic progress after manual baseline"
+    ],
+    "description": "Verifies a fleet manager can enter working days already used in a cycle that started before the app was adopted, and that subsequent days continue from that progress.",
+    "steps": [
+      "Open Add Vehicle",
+      "Enter required vehicle details and set an 8-working-day fuel cycle",
+      "Enter 4 in Working Days Already Used (optional)",
+      "Save the vehicle and open its details"
+    ],
+    "expected": "The vehicle details summary shows 4 entered working days and 4 remaining days for its 8-day cycle; the app continues counting future working days from this manual baseline."
+  },
+  {
+    "name": "Normal fuel fill resets an existing manual cycle baseline",
+    "viewport": "mobile",
+    "covers": [
+      "normal fuel fill",
+      "new fuel cycle starts from fill date",
+      "manual progress baseline reset"
+    ],
+    "description": "Verifies recording a normal fuel fill starts a fresh cycle instead of continuing from progress entered for the previous cycle.",
+    "steps": [
+      "Add a vehicle with an 8-working-day cycle and 4 working days already used",
+      "Record a normal fuel fill for that vehicle today",
+      "Open the vehicle details"
+    ],
+    "expected": "The fuel event is recorded, the last-filled date updates to today, and the new cycle progress starts from that fill date rather than the old manual baseline."
+  },
+  {
+    "name": "Fuel Entry carries the selected vehicle from details",
+    "viewport": "mobile",
+    "covers": [
+      "vehicle-specific fuel entry navigation",
+      "preselected vehicle in fuel form",
+      "normal fuel fill workflow"
+    ],
+    "description": "Verifies opening Fuel Entry from a vehicle's details keeps that vehicle selected without requiring a second selection.",
+    "steps": [
+      "Open Vehicle List and open a specific vehicle's details",
+      "Tap Fuel Due or Fuel Entry",
+      "Review the Vehicle field before saving"
+    ],
+    "expected": "The selected vehicle name and plate are shown as fixed information, with no Vehicle dropdown box; the user can continue without choosing the vehicle again."
+  },
+  {
+    "name": "Fuel priority ranks vehicles by remaining working days",
+    "viewport": "mobile",
+    "covers": [
+      "fuel priority ordering",
+      "working-day based ranking",
+      "manager decision support"
+    ],
+    "description": "Verifies the priority view lists vehicles with the fewest remaining working days first and reflects due status consistently.",
+    "steps": [
+      "Add one vehicle whose last-filled date makes its cycle due",
+      "Add a second vehicle with a more recent last-filled date and a longer cycle",
+      "Open Fuel Priority",
+      "Review the order, working-day counts, remaining days, and status labels"
+    ],
+    "expected": "The vehicle with zero remaining working days appears before the vehicle with more remaining days, and the displayed status matches the calculated cycle progress."
+  },
+  {
+    "name": "Vehicle-specific off-day is excluded from fuel-cycle progress",
+    "viewport": "mobile",
+    "covers": [
+      "vehicle-specific off-day calculation",
+      "expected fuel date shifts for off-days",
+      "Sunday default exclusion"
+    ],
+    "description": "Verifies adding a vehicle-specific off-day does not increase working-day progress and moves the expected fuel date to the next eligible working day.",
+    "steps": [
+      "Sign in and add a vehicle with a 5-working-day cycle and a recent Last Filled Date",
+      "Open that vehicle's Working Calendar",
+      "Register a weekday as an off-day for that vehicle",
+      "Return to Vehicle Details and review working days, remaining days, and expected fuel date"
+    ],
+    "expected": "The registered off-day is excluded from the vehicle's working-day count, remaining days do not decrease for that date, and the expected fuel date shifts accordingly; Sundays are also excluded when the default Sunday-off setting is enabled."
+  },
+  {
+    "name": "Editing cycle progress updates remaining days and fuel date",
+    "viewport": "mobile",
+    "covers": [
+      "clickable working-days details",
+      "clickable remaining-days details",
+      "save vehicle-specific progress baseline",
+      "recalculate remaining days through today",
+      "expected fuel date after manual baseline"
+    ],
+    "description": "Verifies entering a known working-day or remaining-day count at a chosen past date persists and recalculates today's progress using only eligible working days.",
+    "steps": [
+      "Open an existing vehicle's details",
+      "Tap Working Days and inspect the date-by-date details",
+      "Tap Remaining Days, choose a date three days ago, and enter the known remaining count for that date",
+      "Save Progress",
+      "Reopen the Remaining Days details and review today's count and expected fuel date"
+    ],
+    "expected": "Both metric boxes open a detailed date-by-date view; saved progress is retained for that vehicle, elapsed working days after the selected date are added, registered off-days and enabled Sundays are excluded, and today's remaining count and expected fuel date update."
+  }
+]
