@@ -5,11 +5,11 @@
 ## Migration status
 
 - [x] Create separate Supabase project: `omni-fleet-fuel` (`mmgnyumsotudcbilvqep`).
-- [x] Create core tables for organizations, profiles, memberships, vehicles, fuel events, off-days, settings, and audit logs.
-- [x] Enable row-level security and role-based organization access policies.
+- [x] Create core tables for organizations, profiles, memberships, vehicles, fuel events, off-days, settings, audit logs, and the mobile app state store.
+- [x] Enable row-level security and role-based organization access policies. Security advisor scan is currently clean.
 - [x] Ensure new Supabase Auth signups receive a new empty organization workspace; no demo fleet records are inserted.
 - [x] Import and verify the current AppDeploy source snapshot on `migration/appdeploy-source`.
-- [ ] Replace AppDeploy-specific frontend and backend SDK dependencies with Supabase Auth/data access.
+- [ ] Replace AppDeploy-specific frontend and backend SDK dependencies with Supabase Auth/data access (phone OTP requires an SMS provider configuration before production signup/recovery).
 - [ ] Build and test the Android/mobile app shell and mobile-only responsive layouts.
 - [ ] Migrate OTP/recovery and role management securely.
 - [ ] Configure Vercel environment variables for mobile testing/API hosting, without touching Omni-dirsha.
