@@ -67,6 +67,9 @@ const translations: Record<string, string> = {
   'Add vehicle now': 'ተሽከርካሪ አሁን ጨምር',
   'Telebirr': 'ቴሌብር',
   'Settings': 'ቅንብሮች',
+  'Request Password Reset': 'የይለፍ ቃል መመለሻ ጥያቄ ላክ',
+  'Your reset request was sent to the administrator. Contact the administrator to complete the reset.': 'የይለፍ ቃል መመለሻ ጥያቄዎ ለአስተዳዳሪው ተልኳል። ሂደቱን ለማጠናቀቅ አስተዳዳሪውን ያነጋግሩ።',
+  'A password reset request is already waiting for the administrator.': 'የይለፍ ቃል መመለሻ ጥያቄዎ በአስተዳዳሪው እየተጠባበቀ ነው።',
   'Biometric Unlock': 'በፊት ወይም በጣት አሻራ መክፈቻ',
   'Use Face ID or Fingerprint to unlock this app on this device.': 'ይህን መተግበሪያ በፊት ማወቂያ ወይም በጣት አሻራ ለመክፈት ይጠቀሙ።',
   'Enable biometric unlock': 'የባዮሜትሪክ መክፈቻን አብራ',
@@ -1097,6 +1100,7 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [noticeMessage, setNoticeMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -1107,6 +1111,7 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
   }, [initialRecovery]);
 
   const handleError = (error: unknown, fallback: string) => {
+    setNoticeMessage('');
     const e = error as { message?: string; response?: { status?: number; data?: { message?: string; error?: string; detail?: string } | string } };
     const data = e.response?.data;
     const serverMessage = typeof data === 'string' ? data : data?.message || data?.error || data?.detail;
@@ -1115,11 +1120,11 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
 
   const clearPasswordFields = () => { setPassword(''); setConfirm(''); };
   const switchMode = (next: 'login' | 'signup') => {
-    setResetMode(false); setMode(next); setName(''); setPhone(''); setMotherName(''); setFatherName(''); setBirthDate('');
+    setNoticeMessage(''); setResetMode(false); setMode(next); setName(''); setPhone(''); setMotherName(''); setFatherName(''); setBirthDate('');
     setRecoveryPhone(''); setRecoveryMother(''); setRecoveryBirthDate(''); clearPasswordFields(); setErrorMessage('');
   };
   const resetFlow = () => {
-    setResetMode(true); setRecoveryPhone(phone); setRecoveryMother(''); setRecoveryBirthDate(''); clearPasswordFields(); setErrorMessage('');
+    setNoticeMessage(''); setResetMode(true); setRecoveryPhone(phone); setRecoveryMother(''); setRecoveryBirthDate(''); clearPasswordFields(); setErrorMessage('');
   };
 
   const submit = async (event?: React.FormEvent) => {
@@ -1130,21 +1135,17 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
         setErrorMessage(t('Enter phone, mother name and birth date.'));
         return;
       }
-      if (password.length < 8 || password !== confirm) {
-        setErrorMessage(password !== confirm ? t('Passwords do not match.') : t('Password must be at least 8 characters.'));
-        return;
-      }
       setBusy(true);
       try {
-        await api.post('/api/auth/recover-password', {
-          phone: recoveryPhone.trim(), motherName: recoveryMother.trim(), birthDate: recoveryBirthDate, password,
+        const response = await api.post('/api/auth/recover-password', {
+          phone: recoveryPhone.trim(), motherName: recoveryMother.trim(), birthDate: recoveryBirthDate,
         });
         setResetMode(false); setMode('login'); setPhone(recoveryPhone.trim()); clearPasswordFields();
         setRecoveryPhone(''); setRecoveryMother(''); setRecoveryBirthDate('');
         onRecoveryComplete();
-        setErrorMessage(t('Password reset successfully. Please sign in with your new password.'));
+        setNoticeMessage(t(response.data?.message || 'Your reset request was sent to the administrator. Contact the administrator to complete the reset.'));
       } catch (error) {
-        handleError(error, 'Password reset failed.');
+        handleError(error, 'Password reset request failed.');
       } finally { setBusy(false); }
       return;
     }
@@ -1179,7 +1180,7 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
   return <div className="login-page"><div className="login-glow login-glow-one" /><div className="login-glow login-glow-two" /><div className="login-shell"><div className="login-card">
     <div className="login-card-top"><button className="login-circle-btn" type="button" aria-label={t('Back')} onClick={() => window.history.back()}><ChevronLeft size={18} /></button><button className="login-circle-btn" type="button" onClick={() => setLang(lang === 'en' ? 'am' : 'en')}>{lang === 'en' ? 'አማ' : 'EN'}</button></div>
     <div className="login-logo-ring"><div className="login-logo-core"><Fuel size={28} /></div></div>
-    <div className="login-brand"><div className="login-welcome">{resetMode ? t('Reset Password') : mode === 'login' ? t('Welcome Back!') : t('Create Your Account')}</div><p>{resetMode ? t('Enter phone, mother name and birth date.') : mode === 'signup' ? t('Create an account with your phone number and recovery details.') : t('Sign in to manage fleet fuel scheduling')}</p></div>
+    <div className="login-brand"><div className="login-welcome">{resetMode ? t('Request Password Reset') : mode === 'login' ? t('Welcome Back!') : t('Create Your Account')}</div><p>{resetMode ? t('Enter phone, mother name and birth date.') : mode === 'signup' ? t('Create an account with your phone number and recovery details.') : t('Sign in to manage fleet fuel scheduling')}</p></div>
     <form className="login-form" onSubmit={submit}>
       {!resetMode && mode === 'signup' && <>
         <label className="login-field"><span>{t('Full Name')}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={name} onChange={e => setName(e.target.value)} type="text" placeholder={t('Enter your full name')} autoComplete="name" maxLength={120} required /></div></label>
@@ -1195,10 +1196,11 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
         <label className="login-field"><span>{t('Birth Date')}</span><div className="login-input-shell"><span className="login-input-icon"><CalendarDays size={16} /></span><input value={recoveryBirthDate} onChange={e => setRecoveryBirthDate(e.target.value)} type="date" autoComplete="bday" max={new Date().toISOString().slice(0, 10)} required /></div></label>
       </>}
       {!resetMode && <label className="login-field"><span>{t('Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={password} onChange={e => setPassword(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={8} maxLength={128} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>}
-      {(resetMode || mode === 'signup') && <><label className="login-field"><span>{resetMode ? t('New Password') : t('Confirm Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={resetMode ? password : confirm} onChange={e => resetMode ? setPassword(e.target.value) : setConfirm(e.target.value)} type={passwordVisible ? 'text' : 'password'} placeholder={t('Enter your password')} autoComplete="new-password" minLength={8} maxLength={128} required /><button className="password-eye" type="button" aria-label={passwordVisible ? t('Hide password') : t('Show password')} onClick={() => setPasswordVisible(v => !v)}>{passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>{resetMode && <label className="login-field"><span>{t('Confirm Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={confirm} onChange={e => setConfirm(e.target.value)} type={confirmVisible ? 'text' : 'password'} placeholder={t('Confirm password')} autoComplete="new-password" minLength={8} maxLength={128} required /><button className="password-eye" type="button" aria-label={confirmVisible ? t('Hide password') : t('Show password')} onClick={() => setConfirmVisible(v => !v)}>{confirmVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>}</>}
+{!resetMode && mode === 'signup' && <label className="login-field"><span>{t('Confirm Password')}</span><div className="login-input-shell"><span className="login-input-icon">•</span><input value={confirm} onChange={e => setConfirm(e.target.value)} type={confirmVisible ? 'text' : 'password'} placeholder={t('Confirm password')} autoComplete="new-password" minLength={8} maxLength={128} required /><button className="password-eye" type="button" aria-label={confirmVisible ? t('Hide password') : t('Show password')} onClick={() => setConfirmVisible(v => !v)}>{confirmVisible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>}
       <div className="login-options">{!resetMode && mode === 'login' && <span className="login-create-label">{t('Use the phone number registered to this account.')}</span>}{!resetMode && mode === 'login' && <button className="login-link" type="button" disabled={busy} onClick={resetFlow}>{t('Forgot Password?')}</button>}</div>
-      <button className="login-btn" type="submit" disabled={busy || (!resetMode && !phone.trim()) || (resetMode && (!recoveryPhone.trim() || !recoveryMother.trim() || !recoveryBirthDate || password.length < 8 || confirm.length < 8)) || (!resetMode && password.length < 8) || (mode === 'signup' && (!name.trim() || !motherName.trim() || !fatherName.trim() || !birthDate || !confirm || password !== confirm))}><span>{busy ? t('Checking...') : resetMode ? t('Reset Password') : mode === 'login' ? t('Sign In') : t('Create Account')}</span><ChevronRight size={18} /></button>
+      <button className="login-btn" type="submit" disabled={busy || (!resetMode && !phone.trim()) || (resetMode && (!recoveryPhone.trim() || !recoveryMother.trim() || !recoveryBirthDate)) || (!resetMode && password.length < 8) || (mode === 'signup' && (!name.trim() || !motherName.trim() || !fatherName.trim() || !birthDate || !confirm || password !== confirm))}><span>{busy ? t('Checking...') : resetMode ? t('Request Password Reset') : mode === 'login' ? t('Sign In') : t('Create Account')}</span><ChevronRight size={18} /></button>
       {errorMessage && <div className="login-error">{errorMessage}</div>}
+      {noticeMessage && <div className="login-success" role="status">{noticeMessage}</div>}
       <div className="login-create"><span>{resetMode ? t('Remembered your password?') : mode === 'login' ? t('Create Your Account?') : t('Already have an account?')}</span><button type="button" className="login-link strong" onClick={() => resetMode ? switchMode('login') : switchMode(mode === 'login' ? 'signup' : 'login')}>{resetMode ? t('Sign In') : mode === 'login' ? t('Sign up') : t('Sign In')}</button></div>
     </form>
     <div className="login-secure-note"><CheckCircle2 size={15} /><span>{t('Your account information is stored securely by the app server.')}</span></div>
