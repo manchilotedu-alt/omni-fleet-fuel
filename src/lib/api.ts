@@ -99,18 +99,6 @@ export const api = {
       return result({ user: userPayload(data.user), requiresEmailConfirmation: !data.session });
     }
 
-    if (path === '/api/auth/verify-signup') {
-      const phone = normalizePhone(body.contact);
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone,
-        token: String(body.code || ''),
-        type: 'sms',
-      });
-      throwSupabaseError(error);
-      if (!data.user) fail('Phone verification failed. Please request a new code.', 401);
-      return result({ user: userPayload(data.user) });
-    }
-
     if (path === '/api/auth/login') {
       const email = String(body.email || '').trim().toLowerCase();
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -127,18 +115,6 @@ export const api = {
       if (!email) fail('Email is required.');
       const { error } = await supabase.auth.resetPasswordForEmail(email);
       throwSupabaseError(error);
-      return result({ ok: true });
-    }
-
-    if (path === '/api/auth/verify-reset') {
-      const phone = normalizePhone(body.contact);
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone,
-        token: String(body.code || ''),
-        type: 'sms',
-      });
-      throwSupabaseError(error);
-      if (!data.user) fail('The verification code is invalid or expired.', 401);
       return result({ ok: true });
     }
 
