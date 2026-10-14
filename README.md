@@ -6,7 +6,7 @@
 
 - [x] Create separate Supabase project: `omni-fleet-fuel` (`mmgnyumsotudcbilvqep`).
 - [x] Create core tables for organizations, profiles, memberships, vehicles, fuel events, off-days, settings, audit logs, and the mobile app state store.
-- [x] Enable row-level security and role-based organization access policies. Security advisor scan is currently clean.
+- [x] Enable row-level security and role-based organization access policies. The security advisor reports informational no-policy findings for intentionally private recovery tables; client access is revoked.
 - [x] Ensure new Supabase Auth signups receive a new empty organization workspace; no demo fleet records are inserted.
 - [x] Import and verify the current AppDeploy source snapshot on `migration/appdeploy-source`.
 - [x] Replace the frontend AppDeploy API client with a Supabase Auth/data adapter.
@@ -18,8 +18,7 @@
 - [x] Queue verified password recovery requests for administrator assistance; direct password changes are not allowed from the recovery form.
 - [x] Add optional native Face ID/fingerprint unlock using the device's biometric prompt.
 - [x] Add an in-app administrator queue for password recovery, scoped to the caller's organization and protected by server-side role checks.
-- [ ] Connect User Management to real Supabase Auth users and organization memberships; the existing User Management screen is still local UI state only. requests; pending requests are currently stored securely for administrator handling.
-- [ ] Connect the User Management screen to real Supabase Auth invitations and organization memberships; its current list is still app-state data, not actual login accounts.
+- [ ] Connect User Management to real Supabase Auth users/invitations and organization memberships; the existing User Management screen is still local UI state only.
 - [ ] Configure Vercel environment variables for mobile testing/API hosting, without touching Omni-dirsha.
 - [ ] Verify working-day/fuel calculations, calendar, reports, Excel export, and Amharic/English.
 - [ ] Keep the original AppDeploy version untouched until the replacement passes testing.
@@ -34,7 +33,7 @@
 
 ## Important
 
-This branch is still a validation build, not a production release. The Android APK must pass the latest build and real-device tests before release. The User Management screen is not yet connected to real Supabase Auth accounts and organization memberships, and password-recovery requests still need an in-app administrator queue. Keep the original AppDeploy version untouched until the replacement passes testing.
+This branch is still a validation build, not a production release. The Android APK must pass the latest build and real-device tests before release. The User Management screen is not yet connected to real Supabase Auth accounts and organization memberships. The recovery queue is implemented but still needs end-to-end testing alongside the latest Android build. Keep the original AppDeploy version untouched until the replacement passes testing.
 
 ## Source branch
 
