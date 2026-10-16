@@ -2256,3 +2256,107 @@ td strong { color: var(--omni-text); }
 .day-mode .tabs button.selected { border-bottom-color: #168a45 !important; }
 .day-mode .period-tabs button.period-active { background: #168a45 !important; color: #ffffff !important; border-color: #168a45 !important; }
 .day-mode .nav-item.active { color: #168a45 !important; box-shadow: inset 3px 0 0 #168a45 !important; background: rgba(22,138,69,.08) !important; }
+
+
+/* OMNI Fleet Fuel unified navy + amber brand palette.
+   Explicit selectors ensure the login screen and all main app pages share the same theme. */
+:root {
+  --omni-black: #081326;
+  --omni-panel: #101F36;
+  --omni-border: rgba(251, 191, 36, .20);
+  --omni-green: #FBBF24;
+  --omni-green-soft: #FCD34D;
+  --omni-yellow: #FBBF24;
+  --omni-text: #F8FAFC;
+  --omni-muted: #B8C5D8;
+}
+body { background: #081326; color: #F8FAFC; }
+.app-shell { background: #081326 !important; }
+.night-mode .topbar,
+.night-mode .page-head { background: linear-gradient(110deg,#10213D,#0A1427) !important; color:#F8FAFC !important; border-color:rgba(251,191,36,.20) !important; }
+.night-mode .sidebar { background:linear-gradient(180deg,#10213D,#091326) !important; color:#D7E1EF !important; border-color:rgba(251,191,36,.18) !important; }
+.night-mode .detail-card,
+.night-mode .form-card,
+.night-mode .settings-card,
+.night-mode .success-card,
+.night-mode .calendar-card,
+.night-mode .chart-card,
+.night-mode .table-card,
+.night-mode .stat,
+.night-mode .quick,
+.night-mode .workday,
+.night-mode .report-head,
+.night-mode .detail-tab-panel,
+.night-mode .cycle-box,
+.night-mode .detail-grid .info,
+.night-mode .report-stats > *,
+.night-mode .priority-banner { background:linear-gradient(155deg,#14243D,#0D192D) !important; color:#F8FAFC !important; border-color:rgba(251,191,36,.17) !important; }
+.night-mode .table-card th { background:rgba(251,191,36,.10) !important; color:#FDE68A !important; border-color:rgba(251,191,36,.18) !important; }
+.night-mode .table-card td { background:transparent !important; color:#DCE5F1 !important; border-color:rgba(255,255,255,.08) !important; }
+.night-mode .field input,
+.night-mode .field select,
+.night-mode .settings-card input,
+.night-mode .settings-card select,
+.night-mode .notes-area,
+.night-mode .month-selector input,
+.night-mode .report-head select,
+.night-mode .filterbar .search,
+.night-mode .search,
+.night-mode .date-range { background:#091326 !important; color:#F8FAFC !important; border-color:rgba(251,191,36,.25) !important; }
+.night-mode .primary,
+.night-mode .bottom-nav .bottom-add,
+.night-mode .mobile-add-vehicle,
+.night-mode .period-tabs button.period-active { background:#FBBF24 !important; border-color:#FBBF24 !important; color:#10213D !important; }
+.night-mode .link-btn,
+.night-mode .back-btn,
+.night-mode .phone-link,
+.night-mode .tabs button.selected,
+.night-mode .calendar-head button { color:#FBBF24 !important; }
+.night-mode .nav-item.active { color:#FBBF24 !important; background:rgba(251,191,36,.10) !important; box-shadow:inset 3px 0 0 #FBBF24 !important; }
+.day-mode .topbar { background:linear-gradient(110deg,#10213D,#1B3152) !important; }
+.day-mode .primary,
+.day-mode .bottom-nav .bottom-add,
+.day-mode .mobile-add-vehicle,
+.day-mode .period-tabs button.period-active { background:#FBBF24 !important; border-color:#FBBF24 !important; color:#10213D !important; }
+.day-mode .link-btn,
+.day-mode .back-btn,
+.day-mode .phone-link,
+.day-mode .quick svg:first-child,
+.day-mode .stat-icon,
+.day-mode .bottom-nav button.active,
+.day-mode .tabs button.selected { color:#A66A00 !important; }
+.day-mode .tabs button.selected { border-bottom-color:#FBBF24 !important; }
+.day-mode .nav-item.active { color:#8A5A00 !important; box-shadow:inset 3px 0 0 #FBBF24 !important; background:rgba(251,191,36,.16) !important; }
+
+/* Login screen: replace the previous black/lime/orange styling with the actual brand palette. */
+.login-page { color:#F8FAFC !important; background:radial-gradient(circle at 50% 8%,rgba(251,191,36,.13),transparent 28%),radial-gradient(circle at 4% 95%,rgba(59,130,246,.10),transparent 32%),#081326 !important; }
+.login-page::before { background-image:linear-gradient(rgba(248,250,252,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(248,250,252,.025) 1px,transparent 1px) !important; }
+.login-glow { background:#FBBF24 !important; opacity:.10 !important; }
+.login-card { background:linear-gradient(160deg,rgba(20,36,61,.99),rgba(8,19,38,.995)) !important; border-color:rgba(251,191,36,.28) !important; box-shadow:0 30px 100px rgba(0,0,0,.45),0 0 50px rgba(251,191,36,.06) !important; }
+.login-circle-btn { border-color:rgba(248,250,252,.16) !important; background:rgba(248,250,252,.06) !important; color:#F8FAFC !important; }
+.login-circle-btn:hover { border-color:#FBBF24 !important; color:#FBBF24 !important; }
+.login-logo-ring { background:linear-gradient(145deg,#FDE68A,#FBBF24 70%,#B77905) !important; box-shadow:0 0 26px rgba(251,191,36,.18) !important; }
+.login-welcome { color:#F8FAFC !important; }
+.login-brand p { color:#B8C5D8 !important; }
+.login-field > span { color:#D7E1EF !important; }
+.login-input-shell { border-color:rgba(248,250,252,.16) !important; background:rgba(4,12,25,.55) !important; }
+.login-input-shell:focus-within { border-color:#FBBF24 !important; box-shadow:0 0 0 3px rgba(251,191,36,.12) !important; }
+.login-input-icon { color:#FBBF24 !important; }
+.login-input-shell input { color:#F8FAFC !important; }
+.login-input-shell input::placeholder { color:#8FA1BA !important; }
+.login-options,.remember-toggle,.login-create,.login-secure-note { color:#B8C5D8 !important; }
+.login-link,.login-language button.selected-language { color:#FBBF24 !important; }
+.remember-box.checked { border-color:#FBBF24 !important; background:#FBBF24 !important; color:#10213D !important; }
+.login-btn { background:#FBBF24 !important; color:#10213D !important; box-shadow:0 10px 30px rgba(251,191,36,.16) !important; }
+.login-btn:hover:not(:disabled) { background:#FCD34D !important; box-shadow:0 13px 34px rgba(251,191,36,.22) !important; }
+.login-social { border-color:rgba(248,250,252,.16) !important; background:rgba(248,250,252,.045) !important; color:#E2E8F0 !important; }
+.login-social:hover:not(:disabled) { border-color:rgba(251,191,36,.45) !important; color:#FBBF24 !important; }
+.login-secure-note svg { color:#FBBF24 !important; }
+.login-language button { color:#B8C5D8 !important; }
+.login-language span { color:rgba(251,191,36,.65) !important; }
+.login-brand-dot { color:#FBBF24 !important; border-color:rgba(251,191,36,.4) !important; background:rgba(251,191,36,.08) !important; }
+.auth-loading { background:#081326 !important; color:#F8FAFC !important; }
+.update-dialog { background:#10213D !important; border-color:rgba(251,191,36,.35) !important; }
+.update-brand-mark { background:#FBBF24 !important; color:#10213D !important; box-shadow:0 0 24px rgba(251,191,36,.18) !important; }
+.update-dialog h2 { color:#F8FAFC !important; }
+.update-dialog p { color:#B8C5D8 !important; }
