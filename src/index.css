@@ -2167,3 +2167,92 @@ td strong { color: var(--omni-text); }
 .status-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 9px; background: rgba(20,125,224,.12); color: var(--text, #172033); font-size: 12px; font-weight: 700; text-transform: capitalize; }
 .notice-error { margin: 0 0 14px; padding: 11px 13px; border: 1px solid #d94b4b; border-radius: 10px; color: #b42318; background: rgba(217,75,75,.09); }
 
+
+
+/* OMNI brand assets and update prompt */
+.brand-logo { width: 40px; height: 40px; flex: 0 0 40px; object-fit: contain; border-radius: 8px; }
+.login-logo-image { display: block; width: 74px; height: 74px; object-fit: contain; border-radius: 14px; }
+.auth-loading-logo { width: 78px; height: 78px; object-fit: contain; border-radius: 14px; }
+.update-overlay { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.72); backdrop-filter: blur(5px); }
+.update-dialog { width: min(100%, 390px); padding: 24px; border-radius: 20px; background: #101410; color: #f4f8f1; border: 1px solid rgba(255,106,0,.32); box-shadow: 0 24px 80px rgba(0,0,0,.5); text-align: center; }
+.update-brand-mark { width: 62px; height: 62px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 16px; background: linear-gradient(135deg,#087943,#d9db35); color: #fff; font-size: 17px; font-weight: 900; letter-spacing: 1px; box-shadow: 0 0 24px rgba(22,138,69,.24); }
+.update-dialog h2 { margin: 0 0 8px; color: #f4f8f1; font-size: 22px; }
+.update-dialog p { color: #bdc8bd; font-size: 14px; line-height: 1.5; }
+.update-versions { display: grid; gap: 5px; margin: 16px 0 20px; font-size: 12px !important; }
+.update-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.update-actions button { flex: 1 1 120px; min-height: 42px; }
+
+/* Consistent dark OMNI palette across older components that still have legacy blue/white styles. */
+.night-mode .topbar,
+.night-mode .page-head { background: linear-gradient(180deg,#0d120e,#080b08) !important; color: #f2f7ef !important; border-color: rgba(255,106,0,.18) !important; }
+.night-mode .sidebar { background: linear-gradient(180deg,#090c09,#050705) !important; border-color: rgba(255,106,0,.18) !important; }
+.night-mode .detail-card,
+.night-mode .form-card,
+.night-mode .settings-card,
+.night-mode .success-card,
+.night-mode .calendar-card,
+.night-mode .chart-card,
+.night-mode .table-card,
+.night-mode .stat,
+.night-mode .quick,
+.night-mode .workday,
+.night-mode .report-head,
+.night-mode .detail-tab-panel,
+.night-mode .cycle-box,
+.night-mode .detail-grid .info,
+.night-mode .report-stats > *,
+.night-mode .priority-banner { background: linear-gradient(160deg,#111711,#090c09) !important; color: #edf5e9 !important; border-color: rgba(255,106,0,.18) !important; }
+.night-mode .table-card th { background: rgba(255,106,0,.09) !important; color: #e3c4aa !important; border-color: rgba(255,106,0,.16) !important; }
+.night-mode .table-card td { background: transparent !important; color: #dbe6d8 !important; border-color: rgba(255,255,255,.07) !important; }
+.night-mode .table-card td strong,
+.night-mode .detail-card h2,
+.night-mode .detail-card h3,
+.night-mode .detail-card strong,
+.night-mode .form-card h2,
+.night-mode .settings-card h2,
+.night-mode .report-head h2,
+.night-mode .report-stats strong { color: #f3f8ef !important; }
+.night-mode .detail-card p,
+.night-mode .detail-card span,
+.night-mode .form-card p,
+.night-mode .settings-card p,
+.night-mode .report-head p,
+.night-mode .report-stats span { color: #aab8a8 !important; }
+.night-mode .field input,
+.night-mode .field select,
+.night-mode .settings-card input,
+.night-mode .settings-card select,
+.night-mode .notes-area,
+.night-mode .month-selector input,
+.night-mode .report-head select,
+.night-mode .filterbar .search,
+.night-mode .search,
+.night-mode .date-range { background: #090d09 !important; color: #f3f8ef !important; border-color: rgba(255,106,0,.24) !important; }
+.night-mode .outline,
+.night-mode .small-btn,
+.night-mode .period-tabs button { background: rgba(255,106,0,.06) !important; color: #e6eee2 !important; border-color: rgba(255,106,0,.24) !important; }
+.night-mode .period-tabs button.period-active { background: #ff6a00 !important; color: #15110d !important; border-color: #ff6a00 !important; }
+.night-mode .tabs button.selected,
+.night-mode .link-btn,
+.night-mode .back-btn,
+.night-mode .phone-link,
+.night-mode .calendar-head button { color: #ff914d !important; }
+.night-mode .bottom-nav { background: #080b08 !important; border-top-color: rgba(255,106,0,.2) !important; }
+.night-mode .bottom-nav .bottom-add,
+.night-mode .mobile-add-vehicle { background: #ff6a00 !important; color: #16110d !important; }
+
+/* Keep the light theme branded too; remove leftover blue action accents. */
+.day-mode .topbar { background: linear-gradient(110deg,#075b39,#168a45) !important; }
+.day-mode .primary,
+.day-mode .bottom-nav .bottom-add,
+.day-mode .mobile-add-vehicle { background: #168a45 !important; border-color: #168a45 !important; color: #ffffff !important; }
+.day-mode .link-btn,
+.day-mode .back-btn,
+.day-mode .phone-link,
+.day-mode .quick svg:first-child,
+.day-mode .stat-icon,
+.day-mode .bottom-nav button.active,
+.day-mode .tabs button.selected { color: #168a45 !important; }
+.day-mode .tabs button.selected { border-bottom-color: #168a45 !important; }
+.day-mode .period-tabs button.period-active { background: #168a45 !important; color: #ffffff !important; border-color: #168a45 !important; }
+.day-mode .nav-item.active { color: #168a45 !important; box-shadow: inset 3px 0 0 #168a45 !important; background: rgba(22,138,69,.08) !important; }
