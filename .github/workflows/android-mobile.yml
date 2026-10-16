@@ -1,4 +1,4 @@
-# Rebuild on migration branch updates so current source is validated.
+# Build the Android APK for the migration source and feature branches.
 name: Build Android mobile app
 
 on:
@@ -6,8 +6,11 @@ on:
   push:
     branches:
       - migration/appdeploy-source
+      - feat/home-vehicle-search-monthly-summary
     paths:
       - 'src/**'
+      - 'assets/**'
+      - 'public/**'
       - 'package.json'
       - 'vite.config.ts'
       - 'capacitor.config.ts'
@@ -16,8 +19,11 @@ on:
   pull_request:
     branches:
       - main
+      - migration/appdeploy-source
     paths:
       - 'src/**'
+      - 'assets/**'
+      - 'public/**'
       - 'package.json'
       - 'vite.config.ts'
       - 'capacitor.config.ts'
@@ -25,7 +31,7 @@ on:
       - '.github/workflows/android-mobile.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-android:
@@ -44,17 +50,74 @@ jobs:
           java-version: '21'
       - name: Install dependencies
         run: npm install
+      - name: Generate app icon and splash sources
+        run: |
+          node --input-type=module <<'NODE'
+          import sharp from 'sharp';
+          await sharp('assets/omni-fleet-fuel-logo.svg').resize(1024, 1024).png().toFile('assets/icon.png');
+          await sharp('assets/omni-fleet-fuel-logo.svg').resize(1024, 1024).png().toFile('assets/splash.png');
+          NODE
       - name: Build mobile web assets
         run: npm run build
       - name: Add Android platform
         run: npx cap add android
+      - name: Configure stable Android signing when repository secrets are available
+        id: android-signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Stable signing secrets are not configured; the APK can be tested, but releases will not be published."
+            exit 0
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/omni-release.keystore
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path = 'android/app/build.gradle';
+          let text = fs.readFileSync(path, 'utf8');
+          const signingBlock = "signingConfigs { release { storeFile file('omni-release.keystore'); storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD'); keyAlias System.getenv('ANDROID_KEY_ALIAS'); keyPassword System.getenv('ANDROID_KEY_PASSWORD') } }\\n\\nbuildTypes {\\n    debug { signingConfig signingConfigs.release }\\n";
+          text = text.replace('buildTypes {', signingBlock);
+          text = text.replace('    release {', '    release { signingConfig signingConfigs.release');
+          fs.writeFileSync(path, text);
+          NODE
+          echo "available=true" >> "$GITHUB_OUTPUT"
+      - name: Generate native Android icons and splash screen
+        run: npx @capacitor/assets generate --android
       - name: Sync Capacitor
         run: npx cap sync android
+      - name: Set Android version
+        id: android-version
+        run: |
+          VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).version")
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const path = 'android/app/build.gradle';
+          let text = fs.readFileSync(path, 'utf8');
+          text = text.replace(/versionCode\s+\d+/, 'versionCode ' + process.env.GITHUB_RUN_NUMBER);
+          text = text.replace(/versionName\s+['\"][^'\"]+['\"]/, "versionName '" + pkg.version + "'");
+          fs.writeFileSync(path, text);
+          NODE
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Build debug APK
         run: cd android && ./gradlew assembleDebug
+      - name: Prepare release APK name
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk omni-fleet-fuel.apk
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: omni-fleet-fuel-android-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: omni-fleet-fuel.apk
           if-no-files-found: error
+      - name: Publish versioned Android release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/migration/appdeploy-source' && steps.android-signing.outputs.available == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.android-version.outputs.version }}
+          name: OMNI Fleet Fuel v${{ steps.android-version.outputs.version }}
+          files: omni-fleet-fuel.apk
+          generate_release_notes: true

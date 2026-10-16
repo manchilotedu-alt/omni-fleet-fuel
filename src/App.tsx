@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from './lib/api';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
+import { AppLauncher } from '@capacitor/app-launcher';
 import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
 import { supabase } from './lib/supabase';
 import {
@@ -39,6 +41,7 @@ import {
 import * as React from 'react';
 
 type Lang = 'en' | 'am';
+const APP_VERSION = '1.0.1';
 type AppUser = { id: string; email: string; name: string; phone?: string };
 
 const translations: Record<string, string> = {
@@ -400,6 +403,10 @@ const translations: Record<string, string> = {
   'No new notifications': 'አዲስ ማሳወቂያ የለም',
   'Please select a vehicle': 'እባክዎ ተሽከርካሪ ይምረጡ',
   'Search by name or phone': 'በስም ወይም በስልክ ፈልግ',
+  'Search by name, plate, phone or branch': 'በስም፣ በሰሌዳ፣ በስልክ ወይም በቅርንጫፍ ፈልግ',
+  'No matching vehicles found.': 'የሚዛመድ ተሽከርካሪ አልተገኘም።',
+  'Scheduled Working Days': 'የታቀዱ የሥራ ቀናት',
+  'Recorded Off-Days': 'የተመዘገቡ የቀሪ ቀናት',
   'Call': 'ደውል',
   'Monthly Vehicle Finance': 'ወርሃዊ የተሽከርካሪ ፋይናንስ',
   'Each vehicle is calculated separately. Total month days are fixed at 30.': 'እያንዳንዱ ተሽከርካሪ ለብቻው ይሰላል። የወሩ ጠቅላላ ቀናት 30 ተብለው ተወስነዋል።',
@@ -456,6 +463,58 @@ const translations: Record<string, string> = {
   'Blocked': 'ታግዷል',
   'Action': 'ተግባር',
   'Save': 'አስቀምጥ',
+  "Administrator action": "የአስተዳዳሪ ተግባር",
+  "Already have an account?": "መለያ አስቀድሞ አለዎት?",
+  "Checking...": "እየተፈተሸ ነው...",
+  "Clear search": "ፍለጋን አጽዳ",
+  "Confirm password": "የይለፍ ቃሉን አረጋግጥ",
+  "Could not load recovery requests.": "የመለያ መመለሻ ጥያቄዎችን መጫን አልተቻለም።",
+  "Could not reset the password.": "የይለፍ ቃሉን መቀየር አልተቻለም።",
+  "Create Your Account": "መለያዎን ይፍጠሩ",
+  "Create Your Account?": "መለያዎን ይፍጠሩ?",
+  "Day Type": "የቀን ዓይነት",
+  "Each vehicle is calculated separately. Total days follow the selected calendar month.": "እያንዳንዱ ተሽከርካሪ ለብቻው ይሰላል። ጠቅላላ ቀናት በተመረጠው የቀን መቁጠሪያ ወር መሠረት ይወሰናሉ።",
+  "Edit Vehicle": "ተሽከርካሪ አርም",
+  "Enter your full name": "ሙሉ ስምዎን ያስገቡ",
+  "Enter your password": "የይለፍ ቃልዎን ያስገቡ",
+  "Hide password": "የይለፍ ቃሉን ደብቅ",
+  "Name": "ስም",
+  "No dates in selected range.": "በተመረጠው የቀን ክልል ውስጥ ቀኖች የሉም።",
+  "No fuel records for this period.": "ለዚህ ጊዜ የነዳጅ መዝገብ የለም።",
+  "Off-Day": "የቀሪ ቀን",
+  "Only requests from users in your organization are shown.": "የሚታዩት ከድርጅትዎ ተጠቃሚዎች የመጡ ጥያቄዎች ብቻ ናቸው።",
+  "Password must be at least 8 characters.": "የይለፍ ቃሉ ቢያንስ 8 ቁምፊዎች መያዝ አለበት።",
+  "Phone": "ስልክ",
+  "Progress Start Date": "የሂደት መጀመሪያ ቀን",
+  "Remaining Days Details": "የቀሩ ቀናት ዝርዝር",
+  "Remaining Days at Start": "በመጀመሪያ የቀሩ ቀናት",
+  "Remembered your password?": "የይለፍ ቃልዎን አስታውሰዋል?",
+  "Requested": "ተጠይቋል",
+  "Save Progress": "ሂደቱን አስቀምጥ",
+  "Select a vehicle and a date on the calendar.": "ተሽከርካሪ እና በቀን መቁጠሪያው ላይ ቀን ይምረጡ።",
+  "Set the known progress for the selected date. The app recalculates elapsed working days from that date through today, excluding Sundays and registered vehicle off-days.": "ለተመረጠው ቀን የሚታወቀውን ሂደት ያስገቡ። አፑ ከዚያ ቀን እስከ ዛሬ ያሉ የሥራ ቀናትን እሁዶችንና የተመዘገቡ የተሽከርካሪ ቀሪ ቀናትን በማስወገድ እንደገና ያሰላል።",
+  "Show password": "የይለፍ ቃሉን አሳይ",
+  "Sign up": "ተመዝገብ",
+  "The new password must be 8–128 characters.": "አዲሱ የይለፍ ቃል ከ8 እስከ 128 ቁምፊዎች መሆን አለበት።",
+  "This date will be excluded from the selected vehicle's working-day fuel cycle.": "ይህ ቀን ከተመረጠው ተሽከርካሪ የሥራ ቀን የነዳጅ ዙር ይወገዳል።",
+  "Working Days Details": "የሥራ ቀናት ዝርዝር",
+  "Working Days at Start": "በመጀመሪያ የሥራ ቀናት",
+  "custom off-days": "ተጨማሪ የቀሪ ቀናት",
+  "Something went wrong on this page.": "በዚህ ገጽ ላይ ችግር ተፈጥሯል።",
+  "Return to Dashboard": "ወደ ዋና ገጽ ተመለስ",
+  "omni-Fleet": "ኦምኒ-ፍሊት",
+  "No fuel records for this month.": "ለዚህ ወር የነዳጅ መዝገብ የለም።",
+  "OMNI Fleet Fuel Report": "የኦምኒ ፍሊት የነዳጅ ሪፖርት",
+  "Remove": "አስወግድ",
+  "No": "አይ",
+  "Close": "ዝጋ",
+  "Update Available": "አዲስ ስሪት አለ",
+  "A new version of OMNI Fleet Fuel is available.": "አዲስ የኦምኒ ፍሊት ፊዩል ስሪት ዝግጁ ነው።",
+  "Current version": "የአሁኑ ስሪት",
+  "New version": "አዲስ ስሪት",
+  "Later": "በኋላ",
+  "Update Now": "አሁን አዘምን",
+  "09XXXXXXXX or +2519XXXXXXXX": "09XXXXXXXX ወይም +2519XXXXXXXX",
 };
 
 const LanguageContext = createContext<{ lang: Lang; setLang: (lang: Lang) => void; t: (value: string) => string }>({
@@ -675,8 +734,8 @@ class PageErrorBoundary extends React.Component<React.PropsWithChildren<{ onReco
       return (
         <div className="error-state" role="alert">
           <AlertTriangle size={28} />
-          <strong>Something went wrong on this page.</strong>
-          <button type="button" className="primary" onClick={this.props.onRecover}>Return to Dashboard</button>
+          <strong>{translateStatic("Something went wrong on this page.")}</strong>
+          <button type="button" className="primary" onClick={this.props.onRecover}>{translateStatic("Return to Dashboard")}</button>
         </div>
       );
     }
@@ -692,12 +751,43 @@ function App() {
       setLang(value);
       localStorage.setItem('omni_ffm_lang', value);
     }, t: value => lang === 'am' ? (translations[value] || value) : value }}>
-      <AppContent />
+      <><AppContent /><AppUpdateChecker /></>
     </LanguageContext.Provider>
   );
 }
 
 const reverseTranslations = Object.fromEntries(Object.entries(translations).map(([english, amharic]) => [amharic, english]));
+
+const translateStatic = (value: string) => localStorage.getItem('omni_ffm_lang') === 'am' ? (translations[value] || value) : value;
+
+function compareVersions(a: string, b: string) {
+  const aa = a.replace(/^v/i, '').split('.').map(Number);
+  const bb = b.replace(/^v/i, '').split('.').map(Number);
+  for (let i = 0; i < Math.max(aa.length, bb.length); i++) {
+    const diff = (aa[i] || 0) - (bb[i] || 0);
+    if (diff) return diff > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+function AppUpdateChecker() {
+  const { t } = useLanguage();
+  const [update, setUpdate] = useState<{ version: string; url: string } | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetch('https://raw.githubusercontent.com/manchilotedu-alt/omni-fleet-fuel/migration/appdeploy-source/public/app-version.json?ts=' + Date.now(), { cache: 'no-store' })
+      .then(response => { if (!response.ok) throw new Error('Version check unavailable'); return response.json(); })
+      .then((remote: { version?: string; releaseUrl?: string }) => {
+        if (!active || !remote.version || compareVersions(remote.version, APP_VERSION) <= 0) return;
+        setUpdate({ version: remote.version, url: remote.releaseUrl || 'https://github.com/manchilotedu-alt/omni-fleet-fuel/releases/latest' });
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+  if (!update || dismissed) return null;
+  return <div className="update-overlay" role="dialog" aria-modal="true" aria-labelledby="update-title"><div className="update-dialog"><div className="update-brand-mark">OMNI</div><h2 id="update-title">{t('Update Available')}</h2><p>{t('A new version of OMNI Fleet Fuel is available.')}</p><p className="update-versions"><span>{t('Current version')}: {APP_VERSION}</span><span>{t('New version')}: {update.version}</span></p><div className="update-actions"><button type="button" className="outline" onClick={() => setDismissed(true)}>{t('Later')}</button><button type="button" className="primary" onClick={() => { void AppLauncher.openUrl({ url: update.url }); }}>{t('Update Now')}</button></div></div></div>;
+}
 
 function AppContent() {
   const { lang, setLang, t } = useLanguage();
@@ -742,6 +832,14 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
+    let listener: { remove: () => Promise<void> } | undefined;
+    void CapacitorApp.addListener('backButton', () => {
+      window.history.back();
+    }).then(handle => { listener = handle; });
+    return () => { void listener?.remove(); };
+  }, []);
+
+  useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(event => {
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
     });
@@ -751,7 +849,6 @@ function AppContent() {
   useEffect(() => {
     let mounted = true;
     const recoveryLink = /type=recovery/.test(`${window.location.hash}${window.location.search}`);
-    const sessionOpen = sessionStorage.getItem('omni_ffm_session_open') === '1';
     Promise.resolve().then(async () => {
       if (recoveryLink) {
         setPasswordRecovery(true);
@@ -787,11 +884,6 @@ function AppContent() {
           if (mounted) setAuthUser(null);
           return;
         }
-      }
-      if (!sessionOpen) {
-        try { await api.post('/api/auth/logout'); } catch {}
-        if (mounted) setAuthUser(null);
-        return;
       }
       try {
         const response = await api.get('/api/auth/me');
@@ -842,6 +934,7 @@ function AppContent() {
   const [selected, setSelected] = useState<Vehicle | null>(null);
   const [fuelPriorityFilter, setFuelPriorityFilter] = useState<'All' | 'Due' | 'Near Due' | 'Safe'>('All');
   const [search, setSearch] = useState('');
+  const [homeSearch, setHomeSearch] = useState('');
   const [toast, setToast] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(() => localStorage.getItem('omni_ffm_profile_photo') || '');
@@ -1015,7 +1108,7 @@ function AppContent() {
   };
 
   if (!authReady) {
-    return <div className="auth-loading"><Fuel size={28} /><strong>{t('Checking secure session...')}</strong></div>;
+    return <div className="auth-loading"><img className="auth-loading-logo" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /><strong>{t('Checking secure session...')}</strong></div>;
   }
 
   if (!loggedIn || passwordRecovery) {
@@ -1023,7 +1116,7 @@ function AppContent() {
   }
 
   if (!dataReady) {
-    return <div className="auth-loading"><Fuel size={28} /><strong>{t('Checking secure session...')}</strong></div>;
+    return <div className="auth-loading"><img className="auth-loading-logo" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /><strong>{t('Checking secure session...')}</strong></div>;
   }
 
   const current = selected ? states.find(v => v.id === selected.id) ?? states[0] : states[0];
@@ -1032,7 +1125,7 @@ function AppContent() {
   const safe = states.filter(v => v.statusLabel === 'Safe' && v.status === 'Active').length;
 
   const pages: Record<string, React.ReactNode> = {
-    Dashboard: <Dashboard states={states} due={due} near={near} safe={safe} onNavigate={navigate} onSelect={v => { setSelected(v); navigate('Vehicle Details'); }} onCalendar={v => { setSelected(v); navigate('Working Calendar'); }} onStatusClick={status => { setFuelPriorityFilter(status); navigate(status === 'All' ? 'Vehicle List' : 'Fuel Priority'); }} />,
+    Dashboard: <Dashboard states={states} due={due} near={near} safe={safe} search={homeSearch} setSearch={setHomeSearch} onNavigate={navigate} onSelect={v => { setSelected(v); navigate('Vehicle Details'); }} onCalendar={v => { setSelected(v); navigate('Working Calendar'); }} onStatusClick={status => { setFuelPriorityFilter(status); navigate(status === 'All' ? 'Vehicle List' : 'Fuel Priority'); }} />,
     'Vehicle List': <VehicleList states={states} search={search} setSearch={setSearch} onSelect={v => { setSelected(v); navigate('Vehicle Details'); }} onAdd={() => navigate('Add Vehicle')} onDelete={removeVehicle} />,
     'Add Vehicle': <AddVehicle nextId={vehicles.length + 1} onCancel={() => navigate('Vehicle List')} onSave={addVehicle} />,
     'Vehicle Details': current ? <VehicleDetails vehicle={current} fuel={fuel} offDays={offDays} settings={settings} onBack={() => navigate('Vehicle List')} onEdit={() => navigate('Edit Vehicle')} onFuel={() => navigate('Fuel Entry')} onEarly={() => navigate('Early Fill')} onOverride={() => navigate('Manual Override')} onOffDay={() => navigate('Add Off-Day')} onDelete={() => removeVehicle(current)} onSaveNote={updateVehicleNote} onSaveCycleProgress={updateVehicleCycleProgress} /> : null,
@@ -1056,7 +1149,7 @@ function AppContent() {
   return (
     <div className={`app-shell ${nightMode ? 'night-mode' : 'day-mode'}`}>
       <header className="topbar">
-        <div className="brand"><Fuel size={24} /><div><strong>omni-Fleet Fuel Monitoring</strong><span>{t('Fuel scheduling & manager decision support')}</span></div></div>
+        <div className="brand"><img className="brand-logo" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /><div><strong>{translateStatic("omni-Fleet Fuel Monitoring")}</strong><span>{t('Fuel scheduling & manager decision support')}</span></div></div>
         <div className="top-actions">
           <button className="top-mode-toggle" type="button" onClick={() => setNightMode(v => !v)} aria-label={nightMode ? 'Turn off night mode' : 'Turn on night mode'} title={nightMode ? 'Turn off night mode' : 'Turn on night mode'}>{nightMode ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button className="language-toggle" type="button" onClick={() => setLang(lang === 'en' ? 'am' : 'en')} aria-label={lang === 'en' ? 'Switch to Amharic' : 'Switch to English'} title={lang === 'en' ? 'አማርኛ' : 'English'}>{lang === 'en' ? 'አማ' : 'EN'}</button>
@@ -1080,7 +1173,7 @@ function AppContent() {
         <NavItem icon={<KeyRound />} label={t('Recovery Requests')} active={active === 'Recovery Requests'} onClick={() => navigate('Recovery Requests')} />
       </aside>
       <main className="main">
-        <div className="page-head"><div><div className="crumb">omni-Fleet <span>/</span> {t(active === 'Dashboard' ? 'Home' : active)}</div><h1>{t(active === 'Dashboard' ? 'Home' : active)}</h1></div><div className="head-actions">{active === 'Vehicle List' && <button className="primary" onClick={() => navigate('Add Vehicle')}><Plus size={17} /> Add Vehicle</button>}{active === 'Dashboard' && <button className="outline" onClick={() => navigate('Reports')}><FileText size={16} /> {t('View Report')}</button>}</div></div>
+        <div className="page-head"><div><div className="crumb">{translateStatic("omni-Fleet")} <span>/</span> {t(active === 'Dashboard' ? 'Home' : active)}</div><h1>{t(active === 'Dashboard' ? 'Home' : active)}</h1></div><div className="head-actions">{active === 'Vehicle List' && <button className="primary" onClick={() => navigate('Add Vehicle')}><Plus size={17} /> Add Vehicle</button>}{active === 'Dashboard' && <button className="outline" onClick={() => navigate('Reports')}><FileText size={16} /> {t('View Report')}</button>}</div></div>
         <PageErrorBoundary key={active} onRecover={() => navigate('Dashboard')}>{pages[active]}</PageErrorBoundary>
       </main>
       <nav className="bottom-nav">
@@ -1192,12 +1285,12 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
 
   return <div className="login-page"><div className="login-glow login-glow-one" /><div className="login-glow login-glow-two" /><div className="login-shell"><div className="login-card">
     <div className="login-card-top"><button className="login-circle-btn" type="button" aria-label={t('Back')} onClick={() => window.history.back()}><ChevronLeft size={18} /></button><button className="login-circle-btn" type="button" onClick={() => setLang(lang === 'en' ? 'am' : 'en')}>{lang === 'en' ? 'አማ' : 'EN'}</button></div>
-    <div className="login-logo-ring"><div className="login-logo-core"><Fuel size={28} /></div></div>
+    <div className="login-logo-ring"><img className="login-logo-image" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /></div>
     <div className="login-brand"><div className="login-welcome">{resetMode ? t('Request Password Reset') : mode === 'login' ? t('Welcome Back!') : t('Create Your Account')}</div><p>{resetMode ? t('Enter phone, mother name and birth date.') : mode === 'signup' ? t('Create an account with your phone number and recovery details.') : t('Sign in to manage fleet fuel scheduling')}</p></div>
     <form className="login-form" onSubmit={submit}>
       {!resetMode && mode === 'signup' && <>
         <label className="login-field"><span>{t('Full Name')}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={name} onChange={e => setName(e.target.value)} type="text" placeholder={t('Enter your full name')} autoComplete="name" maxLength={120} required /></div></label>
-        <label className="login-field"><span>{t('Phone Number')}</span><div className="login-input-shell"><span className="login-input-icon"><UserCircle size={16} /></span><input value={phone} onChange={e => setPhone(e.target.value)} type="tel" placeholder="09XXXXXXXX or +2519XXXXXXXX" autoComplete="tel" maxLength={20} required /></div></label>
+        <label className="login-field"><span>{t('Phone Number')}</span><div className="login-input-shell"><span className="login-input-icon"><UserCircle size={16} /></span><input value={phone} onChange={e => setPhone(e.target.value)} type="tel" placeholder={translateStatic("09XXXXXXXX or +2519XXXXXXXX")} autoComplete="tel" maxLength={20} required /></div></label>
         <label className="login-field"><span>{t("Mother's Full Name")}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={motherName} onChange={e => setMotherName(e.target.value)} type="text" placeholder={t("Enter your mother's full name")} autoComplete="off" maxLength={120} required /></div></label>
         <label className="login-field"><span>{t("Father's Full Name")}</span><div className="login-input-shell"><span className="login-input-icon">●</span><input value={fatherName} onChange={e => setFatherName(e.target.value)} type="text" placeholder={t("Enter your father's full name")} autoComplete="off" maxLength={120} required /></div></label>
         <label className="login-field"><span>{t('Birth Date')}</span><div className="login-input-shell"><span className="login-input-icon"><CalendarDays size={16} /></span><input value={birthDate} onChange={e => setBirthDate(e.target.value)} type="date" autoComplete="bday" max={new Date().toISOString().slice(0, 10)} required /></div></label>
@@ -1217,14 +1310,16 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
       <div className="login-create"><span>{resetMode ? t('Remembered your password?') : mode === 'login' ? t('Create Your Account?') : t('Already have an account?')}</span><button type="button" className="login-link strong" onClick={() => resetMode ? switchMode('login') : switchMode(mode === 'login' ? 'signup' : 'login')}>{resetMode ? t('Sign In') : mode === 'login' ? t('Sign up') : t('Sign In')}</button></div>
     </form>
     <div className="login-secure-note"><CheckCircle2 size={15} /><span>{t('Your account information is stored securely by the app server.')}</span></div>
-    <div className="login-language login-language-bottom"><button className={lang === 'am' ? 'selected-language' : ''} onClick={() => setLang('am')}>አማርኛ</button><span>·</span><button className={lang === 'en' ? 'selected-language' : ''} onClick={() => setLang('en')}>English</button></div>
-  </div><div className="login-brand-mark"><span className="login-brand-dot"><Fuel size={16} /></span><strong>omni-Fleet</strong></div></div></div>;
+    <div className="login-language login-language-bottom"><button className={lang === 'am' ? 'selected-language' : ''} onClick={() => setLang('am')}>አማርኛ</button><span>·</span><button className={lang === 'en' ? 'selected-language' : ''} onClick={() => setLang('en')}>{translateStatic("English")}</button></div>
+  </div><div className="login-brand-mark"><span className="login-brand-dot"><Fuel size={16} /></span><strong>{translateStatic("omni-Fleet")}</strong></div></div></div>;
 }
 
-function Dashboard({ states, due, near, safe, onNavigate, onSelect, onCalendar, onStatusClick }: { states: VehicleState[]; due: number; near: number; safe: number; onNavigate: (p: string) => void; onSelect: (v: Vehicle) => void; onCalendar: (v: Vehicle) => void; onStatusClick: (status: 'Due' | 'Near Due' | 'Safe' | 'All') => void }) {
+function Dashboard({ states, due, near, safe, search, setSearch, onNavigate, onSelect, onCalendar, onStatusClick }: { states: VehicleState[]; due: number; near: number; safe: number; search: string; setSearch: (value: string) => void; onNavigate: (p: string) => void; onSelect: (v: Vehicle) => void; onCalendar: (v: Vehicle) => void; onStatusClick: (status: 'Due' | 'Near Due' | 'Safe' | 'All') => void }) {
   const { t } = useLanguage();
   const today = new Date();
-  return <div className="content"><div className="workday"><CalendarDays size={17} /> <strong>{formatDate(today)}</strong><span>{t(today.getDay() === 0 ? 'Sunday — Default Off-Day' : 'Working Day')}</span></div><div className="alert"><AlertTriangle size={21} /><div><strong>{due} {t('vehicles are due for fuel')}</strong><small>{t('Priority is calculated from working days, fuel cycle and registered off-days.')}</small></div><button type="button" onClick={() => onNavigate('Fuel Priority')}>{t('Review Priority')} <ChevronRight size={16} /></button></div><div className="stat-grid"><Stat icon={<Fuel />} label={t('Due Today')} value={due} tone="red" onClick={() => onStatusClick('Due')} /><Stat icon={<Clock3 />} label={t('Near Due')} value={near} tone="amber" onClick={() => onStatusClick('Near Due')} /><Stat icon={<CheckCircle2 />} label={t('Safe')} value={safe} tone="green" onClick={() => onStatusClick('Safe')} /><Stat icon={<Car />} label={t('Total Vehicles')} value={states.length} tone="blue" onClick={() => onStatusClick('All')} /></div><div className="section-title"><h2>{t('Manager Decision Support')}</h2></div><div className="quick-grid"><Quick icon={<Fuel />} label={t('Record Fuel')} onClick={() => onNavigate('Fuel Entry')} /><Quick icon={<Gauge />} label={t('Fuel Priority')} onClick={() => onNavigate('Fuel Priority')} /><Quick icon={<Wrench />} label={t('Add Off-Day')} onClick={() => onNavigate('Working Calendar')} /><Quick icon={<Car />} label={t('Find Vehicle')} onClick={() => onNavigate('Vehicle List')} /><Quick icon={<FileText />} label={t('Reports')} onClick={() => onNavigate('Reports')} /></div><div className="section-title row-between"><h2>{t("Today's Fuel Priority")}</h2><button className="link-btn" onClick={() => onNavigate('Fuel Priority')}>{t('View all')} <ChevronRight size={15} /></button></div><div className="table-card"><table><thead><tr><th>#</th><th>{t('Vehicle')}</th><th>{t('Name')}</th><th>{t('Phone')}</th><th>{t('Plate')}</th><th>{t('Working Days')}</th><th>{t('Days Remaining')}</th><th>{t('Expected Fuel')}</th><th>{t('Status')}</th><th>{t('Action')}</th></tr></thead><tbody>{[...states.filter(v => v.status === 'Active')].sort(prioritySort).slice(0, 6).map((v, i) => <tr key={v.id}><td>{i + 1}</td><td><strong>{v.code}</strong></td><td><button type="button" className="link-btn vehicle-name-link" onClick={() => onSelect(v)}>{v.name}</button></td><td><a className="phone-link" href={`tel:${v.phone}`} aria-label={`${t('Call')} ${v.phone}`}>{v.phone}</a></td><td>{v.plate}</td><td>{v.workingDays}/{v.cycle}</td><td><button type="button" className="link-btn" onClick={() => onCalendar(v)}>{v.remaining}</button></td><td>{formatDate(v.expected)}</td><td><Status state={v} /></td><td><button className="small-btn" onClick={() => onSelect(v)}>{t('Details')}</button></td></tr>)}</tbody></table></div></div>;
+  const query = search.trim().toLocaleLowerCase();
+  const searchResults = query ? states.filter(v => [v.name, v.code, v.plate, v.phone, v.branch, v.type, v.fuel].some(value => String(value || '').toLocaleLowerCase().includes(query))).slice(0, 6) : [];
+  return <div className="content"><div className="home-search-row" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start', marginBottom: 16 }}><div className="workday"><CalendarDays size={17} /> <strong>{formatDate(today)}</strong><span>{t(today.getDay() === 0 ? 'Sunday — Default Off-Day' : 'Working Day')}</span></div><div className="home-vehicle-search" style={{ flex: '1 1 280px', minWidth: 240, position: 'relative' }}><label style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '0 12px', border: '1px solid var(--border, rgba(255,255,255,.16))', borderRadius: 12, background: 'var(--card, #111714)', color: 'var(--text, #fff)' }}><Search size={18} /><input aria-label={t('Search by name, plate, phone or branch')} value={search} onChange={e => setSearch(e.target.value)} placeholder={t('Search by name, plate, phone or branch')} style={{ width: '100%', minWidth: 0, border: 0, outline: 0, background: 'transparent', color: 'inherit' }} /><button type="button" className="icon-btn" aria-label={t('Clear search')} onClick={() => setSearch('')} style={{ display: search ? 'inline-flex' : 'none' }}><X size={16} /></button></label>{query && <div role="listbox" aria-label={t('Find Vehicle')} style={{ position: 'absolute', zIndex: 30, top: 'calc(100% + 6px)', left: 0, right: 0, maxHeight: 320, overflowY: 'auto', border: '1px solid var(--border, rgba(255,255,255,.16))', borderRadius: 12, background: 'var(--card, #111714)', boxShadow: '0 14px 35px rgba(0,0,0,.24)' }}>{searchResults.length ? searchResults.map(v => <button key={v.id} type="button" role="option" onClick={() => { setSearch(''); onSelect(v); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3, width: '100%', padding: '11px 13px', textAlign: 'left', border: 0, borderBottom: '1px solid var(--border, rgba(255,255,255,.1))', background: 'transparent', color: 'inherit', cursor: 'pointer' }}><strong>{v.type || t('Vehicle')} · {v.plate}</strong><span style={{ fontSize: 12, opacity: .75 }}>{v.name || t('Contact Name')} · {v.phone || t('Phone')} · {v.branch || '—'}</span></button>) : <div style={{ padding: 14, fontSize: 13, opacity: .75 }}>{t('No matching vehicles found.')}</div>}</div>}</div></div><div className="alert"><AlertTriangle size={21} /><div><strong>{due} {t('vehicles are due for fuel')}</strong><small>{t('Priority is calculated from working days, fuel cycle and registered off-days.')}</small></div><button type="button" onClick={() => onNavigate('Fuel Priority')}>{t('Review Priority')} <ChevronRight size={16} /></button></div><div className="stat-grid"><Stat icon={<Fuel />} label={t('Due Today')} value={due} tone="red" onClick={() => onStatusClick('Due')} /><Stat icon={<Clock3 />} label={t('Near Due')} value={near} tone="amber" onClick={() => onStatusClick('Near Due')} /><Stat icon={<CheckCircle2 />} label={t('Safe')} value={safe} tone="green" onClick={() => onStatusClick('Safe')} /><Stat icon={<Car />} label={t('Total Vehicles')} value={states.length} tone="blue" onClick={() => onStatusClick('All')} /></div><div className="section-title"><h2>{t('Manager Decision Support')}</h2></div><div className="quick-grid"><Quick icon={<Fuel />} label={t('Record Fuel')} onClick={() => onNavigate('Fuel Entry')} /><Quick icon={<Gauge />} label={t('Fuel Priority')} onClick={() => onNavigate('Fuel Priority')} /><Quick icon={<Wrench />} label={t('Add Off-Day')} onClick={() => onNavigate('Working Calendar')} /><Quick icon={<Car />} label={t('Find Vehicle')} onClick={() => onNavigate('Vehicle List')} /><Quick icon={<FileText />} label={t('Reports')} onClick={() => onNavigate('Reports')} /></div><div className="section-title row-between"><h2>{t("Today's Fuel Priority")}</h2><button className="link-btn" onClick={() => onNavigate('Fuel Priority')}>{t('View all')} <ChevronRight size={15} /></button></div><div className="table-card"><table><thead><tr><th>#</th><th>{t('Vehicle')}</th><th>{t('Name')}</th><th>{t('Phone')}</th><th>{t('Plate')}</th><th>{t('Working Days')}</th><th>{t('Days Remaining')}</th><th>{t('Expected Fuel')}</th><th>{t('Status')}</th><th>{t('Action')}</th></tr></thead><tbody>{[...states.filter(v => v.status === 'Active')].sort(prioritySort).slice(0, 6).map((v, i) => <tr key={v.id}><td>{i + 1}</td><td><strong>{v.code}</strong></td><td><button type="button" className="link-btn vehicle-name-link" onClick={() => onSelect(v)}>{v.name}</button></td><td><a className="phone-link" href={`tel:${v.phone}`} aria-label={`${t('Call')} ${v.phone}`}>{v.phone}</a></td><td>{v.plate}</td><td>{v.workingDays}/{v.cycle}</td><td><button type="button" className="link-btn" onClick={() => onCalendar(v)}>{v.remaining}</button></td><td>{formatDate(v.expected)}</td><td><Status state={v} /></td><td><button className="small-btn" onClick={() => onSelect(v)}>{t('Details')}</button></td></tr>)}</tbody></table></div></div>;
 }
 
 function prioritySort(a: VehicleState, b: VehicleState) {
@@ -1298,8 +1393,9 @@ function VehicleDetails({ vehicle, fuel, offDays, settings, onBack, onEdit, onFu
     return Math.min(30, count);
   })();
   const monthRemainingDays = Math.max(0, 30 - monthWorkedDays);
+  const monthOffDays = vehicleOffDays.filter(o => o.date.slice(0, 7) === month).length;
   const saveNote = () => onSaveNote(vehicle.id, note);
-  return <div className="content"><button className="back-btn" onClick={onBack}><ChevronLeft size={18} /> Back to vehicles</button><div className="detail-card"><div className="detail-hero"><div className="large-car"><Car size={72} /></div><div><span className="eyebrow">{vehicle.code}</span><h2>{vehicle.plate}</h2><p>{vehicle.name} · {vehicle.type} · {vehicle.fuel} · {vehicle.branch}</p><a className="phone-link detail-phone" href={`tel:${vehicle.phone}`}>{vehicle.phone}</a></div><div className="detail-hero-actions"><button className="outline edit" onClick={onEdit}><Edit3 size={15} /> {t('Edit')}</button><button className="outline danger-action" onClick={onDelete}><X size={15} /> {t('Remove Vehicle')}</button></div></div><div className="tabs">{(['Overview','Fuel History','Off-Days','Notes'] as const).map(item => <button key={item} type="button" className={tab === item ? 'selected' : ''} onClick={() => setTab(item)}>{t(item)}</button>)}</div>{tab === 'Overview' && <><div className="detail-grid"><Info label="Contact Name" value={vehicle.name} /><Info label="Phone Number" value={vehicle.phone} /><Info label="Plate Number" value={vehicle.plate} /><Info label="Type" value={vehicle.type} /><Info label="Fuel Type" value={vehicle.fuel} /><Info label="Fuel Cycle" value={`${vehicle.cycle} Working Days`} /><Info label="Working Days" value={`${vehicle.workingDays} / ${vehicle.cycle}`} /><Info label="Expected Next Fuel" value={formatDate(vehicle.expected)} /></div><div className="report-stats detail-stats detail-month-summary"><Stat icon={<CalendarDays />} label={t('Entered Days')} value={vehicle.workingDays} tone="blue" onClick={() => setCyclePanel('working')} /><Stat icon={<Clock3 />} label={t('Remaining Days')} value={vehicle.remaining} tone="amber" onClick={() => setCyclePanel('remaining')} /><Stat icon={<CircleDollarSign />} label={t('Fuel Cost (ETB)')} value={monthTotal} tone="green" /></div><div className="cycle-box"><div><span>Last Filled</span><strong>{formatDate(vehicle.lastFilled)}</strong></div><div><span>Working Days</span><button type="button" className="link-btn" onClick={() => setCyclePanel('working')}>{vehicle.workingDays} / {vehicle.cycle}</button></div><div><span>Days Remaining</span><button type="button" className="link-btn" onClick={() => setCyclePanel('remaining')}>{vehicle.remaining}</button></div><div><span>Expected Date</span><strong>{formatDate(vehicle.expected)}</strong></div><Status state={vehicle} /></div><div className="detail-actions"><button className="primary" onClick={onFuel}><Fuel size={17} /> {t('Fuel Due')}</button><button className="outline" onClick={onEarly}><Clock3 size={17} /> {t('Early Fill')}</button><button className="outline" onClick={onOverride}><AlertTriangle size={17} /> {t('Manual Override')}</button><button className="outline" onClick={onOffDay}><CalendarDays size={17} /> {t('Add Off-Day')}</button></div></>}{tab === 'Fuel History' && <div className="detail-tab-panel"><div className="month-selector"><label>{t('Monthly')}<input type="month" value={month} onChange={e => setMonth(e.target.value)} /></label></div><div className="report-stats detail-stats"><Stat icon={<CircleDollarSign />} label={t('Fuel Cost (ETB)')} value={monthTotal} tone="green" /><Stat icon={<Fuel />} label="Fuel Fills" value={monthFuel.length} tone="blue" /><Stat icon={<CircleDollarSign />} label="Average Fill Cost" value={Math.round(monthAverage)} tone="amber" /></div><div className="table-card"><table><thead><tr><th>#</th><th>{t('Date')}</th><th>{t('Time')}</th><th>{t('Amount')}</th><th>{t('Payment Method')}</th><th>{t('Timing')}</th></tr></thead><tbody>{monthFuel.length ? monthFuel.map((f, i) => <tr key={f.id}><td>{i + 1}</td><td>{formatDate(f.date)}</td><td>{f.time}</td><td>{f.amount.toLocaleString()} ETB</td><td>{t(f.method)}</td><td>{t(f.timing)}</td></tr>) : <tr><td colSpan={6} className="empty-state">No fuel records for this month.</td></tr>}</tbody></table></div></div>}{tab === 'Off-Days' && <div className="detail-tab-panel"><div className="section-title row-between"><h2>{t('Off-Days')}</h2><button className="primary" onClick={onOffDay}><Plus size={16} /> {t('Add Off-Day')}</button></div><div className="table-card"><table><thead><tr><th>#</th><th>{t('Date')}</th><th>{t('Reason')}</th><th>{t('Note')}</th></tr></thead><tbody>{vehicleOffDays.length ? vehicleOffDays.map((o, i) => <tr key={o.id}><td>{i + 1}</td><td>{formatDate(o.date)}</td><td>{t(o.reason)}</td><td>{o.note}</td></tr>) : <tr><td colSpan={4} className="empty-state">No off-day records for this vehicle.</td></tr>}</tbody></table></div></div>}{tab === 'Notes' && <div className="detail-tab-panel"><div className="field"><span>{t('Notes')}</span><textarea className="notes-area" value={note} onChange={e => setNote(e.target.value)} placeholder="Vehicle notes..." /></div><div className="form-actions"><button className="primary" onClick={saveNote}>{t('Save')}</button></div></div>}</div>{cyclePanel && <CycleProgressPanel vehicle={vehicle} offDays={offDays} settings={settings} mode={cyclePanel} onClose={() => setCyclePanel(null)} onSave={progress => { onSaveCycleProgress(vehicle.id, progress); setCyclePanel(null); }} />}</div>;
+  return <div className="content"><button className="back-btn" onClick={onBack}><ChevronLeft size={18} /> {translateStatic("Back to vehicles")}</button><div className="detail-card"><div className="detail-hero"><div className="large-car"><Car size={72} /></div><div><span className="eyebrow">{vehicle.code}</span><h2>{vehicle.plate}</h2><p>{vehicle.name} · {vehicle.type} · {vehicle.fuel} · {vehicle.branch}</p><a className="phone-link detail-phone" href={`tel:${vehicle.phone}`}>{vehicle.phone}</a></div><div className="detail-hero-actions"><button className="outline edit" onClick={onEdit}><Edit3 size={15} /> {t('Edit')}</button><button className="outline danger-action" onClick={onDelete}><X size={15} /> {t('Remove Vehicle')}</button></div></div><div className="tabs">{(['Overview','Fuel History','Off-Days','Notes'] as const).map(item => <button key={item} type="button" className={tab === item ? 'selected' : ''} onClick={() => setTab(item)}>{t(item)}</button>)}</div>{tab === 'Overview' && <><div className="detail-grid"><Info label="Contact Name" value={vehicle.name} /><Info label="Phone Number" value={vehicle.phone} /><Info label="Plate Number" value={vehicle.plate} /><Info label="Type" value={vehicle.type} /><Info label="Fuel Type" value={vehicle.fuel} /><Info label="Fuel Cycle" value={`${vehicle.cycle} Working Days`} /><Info label="Working Days" value={`${vehicle.workingDays} / ${vehicle.cycle}`} /><Info label="Expected Next Fuel" value={formatDate(vehicle.expected)} /></div><div className="detail-tab-panel monthly-overview-summary"><div className="month-selector"><label>{t('Monthly')}<input type="month" value={month} onChange={e => setMonth(e.target.value)} /></label></div><div className="report-stats detail-stats"><Stat icon={<Fuel />} label={t('Fuel Fills')} value={monthFuel.length} tone="blue" /><Stat icon={<CircleDollarSign />} label={t('Fuel Cost (ETB)')} value={monthTotal} tone="green" /><Stat icon={<CalendarDays />} label={t('Scheduled Working Days')} value={monthWorkedDays} tone="amber" /><Stat icon={<CalendarDays />} label={t('Recorded Off-Days')} value={monthOffDays} tone="red" /></div></div><div className="report-stats detail-stats detail-month-summary"><Stat icon={<CalendarDays />} label={t('Entered Days')} value={vehicle.workingDays} tone="blue" onClick={() => setCyclePanel('working')} /><Stat icon={<Clock3 />} label={t('Remaining Days')} value={vehicle.remaining} tone="amber" onClick={() => setCyclePanel('remaining')} /></div><div className="cycle-box"><div><span>{translateStatic("Last Filled")}</span><strong>{formatDate(vehicle.lastFilled)}</strong></div><div><span>{translateStatic("Working Days")}</span><button type="button" className="link-btn" onClick={() => setCyclePanel('working')}>{vehicle.workingDays} / {vehicle.cycle}</button></div><div><span>{translateStatic("Days Remaining")}</span><button type="button" className="link-btn" onClick={() => setCyclePanel('remaining')}>{vehicle.remaining}</button></div><div><span>{translateStatic("Expected Date")}</span><strong>{formatDate(vehicle.expected)}</strong></div><Status state={vehicle} /></div><div className="detail-actions"><button className="primary" onClick={onFuel}><Fuel size={17} /> {t('Fuel Due')}</button><button className="outline" onClick={onEarly}><Clock3 size={17} /> {t('Early Fill')}</button><button className="outline" onClick={onOverride}><AlertTriangle size={17} /> {t('Manual Override')}</button><button className="outline" onClick={onOffDay}><CalendarDays size={17} /> {t('Add Off-Day')}</button></div></>}{tab === 'Fuel History' && <div className="detail-tab-panel"><div className="month-selector"><label>{t('Monthly')}<input type="month" value={month} onChange={e => setMonth(e.target.value)} /></label></div><div className="report-stats detail-stats"><Stat icon={<CircleDollarSign />} label={t('Fuel Cost (ETB)')} value={monthTotal} tone="green" /><Stat icon={<Fuel />} label="Fuel Fills" value={monthFuel.length} tone="blue" /><Stat icon={<CircleDollarSign />} label="Average Fill Cost" value={Math.round(monthAverage)} tone="amber" /></div><div className="table-card"><table><thead><tr><th>#</th><th>{t('Date')}</th><th>{t('Time')}</th><th>{t('Amount')}</th><th>{t('Payment Method')}</th><th>{t('Timing')}</th></tr></thead><tbody>{monthFuel.length ? monthFuel.map((f, i) => <tr key={f.id}><td>{i + 1}</td><td>{formatDate(f.date)}</td><td>{f.time}</td><td>{f.amount.toLocaleString()} ETB</td><td>{t(f.method)}</td><td>{t(f.timing)}</td></tr>) : <tr><td colSpan={6} className="empty-state">{translateStatic("No fuel records for this month.")}</td></tr>}</tbody></table></div></div>}{tab === 'Off-Days' && <div className="detail-tab-panel"><div className="section-title row-between"><h2>{t('Off-Days')}</h2><button className="primary" onClick={onOffDay}><Plus size={16} /> {t('Add Off-Day')}</button></div><div className="table-card"><table><thead><tr><th>#</th><th>{t('Date')}</th><th>{t('Reason')}</th><th>{t('Note')}</th></tr></thead><tbody>{vehicleOffDays.length ? vehicleOffDays.map((o, i) => <tr key={o.id}><td>{i + 1}</td><td>{formatDate(o.date)}</td><td>{t(o.reason)}</td><td>{o.note}</td></tr>) : <tr><td colSpan={4} className="empty-state">No off-day records for this vehicle.</td></tr>}</tbody></table></div></div>}{tab === 'Notes' && <div className="detail-tab-panel"><div className="field"><span>{t('Notes')}</span><textarea className="notes-area" value={note} onChange={e => setNote(e.target.value)} placeholder={translateStatic("Vehicle notes...")} /></div><div className="form-actions"><button className="primary" onClick={saveNote}>{t('Save')}</button></div></div>}</div>{cyclePanel && <CycleProgressPanel vehicle={vehicle} offDays={offDays} settings={settings} mode={cyclePanel} onClose={() => setCyclePanel(null)} onSave={progress => { onSaveCycleProgress(vehicle.id, progress); setCyclePanel(null); }} />}</div>;
 }
 
 function CycleProgressPanel({ vehicle, offDays, settings, mode, onClose, onSave }: { vehicle: VehicleState; offDays: OffDay[]; settings: AppSettings; mode: 'working' | 'remaining'; onClose: () => void; onSave: (progress: { cycleDaysUsed: number; cycleProgressStartDate: string }) => void }) {
@@ -1356,7 +1452,7 @@ function FuelEntry({ states, initialPlate, onCancel, onSave }: { states: Vehicle
   const [method, setMethod] = useState('Telebirr');
   const [reason, setReason] = useState('Normal');
   const lockedToInitialVehicle = Boolean(initialPlate && states.some(item => item.plate === initialPlate));
-  return <FormShell title="Fuel Entry" subtitle="Record a normal fuel fill. Saving starts a new fuel cycle." onCancel={onCancel} onSubmit={() => v && onSave({ id: Date.now(), date, time: formatTime(), plate: v.plate, vehicle: v.code, odometer: Number(odometer) || 0, amount: Number(amount) || 0, method, reason, timing: 'Normal (Due Date)' })} submitLabel="Save & Start New Cycle">{lockedToInitialVehicle ? <div className="field"><span>Vehicle</span><div className="input-like">{v ? `${v.name} — ${v.plate}` : ''}</div></div> : <SelectField label="Vehicle" value={plate} onChange={setPlate} options={states.map(x => x.plate)} labels={Object.fromEntries(states.map(x => [x.plate, `${x.name} — ${x.plate}`]))} />}<Field label="Date" value={date} onChange={setDate} type="date" /><Field label="Odometer" value={odometer} onChange={setOdometer} type="number" min={0} /><Field label="Amount" value={amount} onChange={setAmount} type="number" min={0} /><SelectField label="Payment Method" value={method} onChange={setMethod} options={['Telebirr', 'Cash', 'Bank']} /><SelectField label="Reason" value={reason} onChange={setReason} options={['Normal', 'Operational Need']} /><div className="alert compact"><CheckCircle2 size={18} /><span>{v ? `${v.plate} is ${v.statusLabel}. Current cycle: ${v.workingDays}/${v.cycle} working days.` : 'Select a vehicle.'}</span></div></FormShell>;
+  return <FormShell title="Fuel Entry" subtitle="Record a normal fuel fill. Saving starts a new fuel cycle." onCancel={onCancel} onSubmit={() => v && onSave({ id: Date.now(), date, time: formatTime(), plate: v.plate, vehicle: v.code, odometer: Number(odometer) || 0, amount: Number(amount) || 0, method, reason, timing: 'Normal (Due Date)' })} submitLabel="Save & Start New Cycle">{lockedToInitialVehicle ? <div className="field"><span>{translateStatic("Vehicle")}</span><div className="input-like">{v ? `${v.name} — ${v.plate}` : ''}</div></div> : <SelectField label="Vehicle" value={plate} onChange={setPlate} options={states.map(x => x.plate)} labels={Object.fromEntries(states.map(x => [x.plate, `${x.name} — ${x.plate}`]))} />}<Field label="Date" value={date} onChange={setDate} type="date" /><Field label="Odometer" value={odometer} onChange={setOdometer} type="number" min={0} /><Field label="Amount" value={amount} onChange={setAmount} type="number" min={0} /><SelectField label="Payment Method" value={method} onChange={setMethod} options={['Telebirr', 'Cash', 'Bank']} /><SelectField label="Reason" value={reason} onChange={setReason} options={['Normal', 'Operational Need']} /><div className="alert compact"><CheckCircle2 size={18} /><span>{v ? `${v.plate} is ${v.statusLabel}. Current cycle: ${v.workingDays}/${v.cycle} working days.` : 'Select a vehicle.'}</span></div></FormShell>;
 }
 
 function EarlyFill({ states, onCancel, onSave }: { states: VehicleState[]; onCancel: () => void; onSave: (r: FuelRecord) => void }) {
@@ -1386,7 +1482,7 @@ function ManualOverride({ states, onCancel, onSave }: { states: VehicleState[]; 
   const [method, setMethod] = useState('Telebirr');
   const [reason, setReason] = useState('Emergency');
   const [approvedBy, setApprovedBy] = useState('Fleet Manager');
-  return <FormShell title="Manual Override" subtitle="Register an exceptional fuel decision without destroying the vehicle's normal cycle." onCancel={onCancel} onSubmit={() => v && onSave({ id: Date.now(), date, time: formatTime(), plate: v.plate, vehicle: v.code, odometer: Number(odometer) || 0, amount: Number(amount) || 0, method, reason, timing: 'Manual Override', overrideReason: reason, approvedBy })} submitLabel="Record Override"><SelectField label="Vehicle" value={plate} onChange={setPlate} options={states.map(x => x.plate)} labels={Object.fromEntries(states.map(x => [x.plate, `${x.name} — ${x.plate}`]))} /><Field label="Date" value={date} onChange={setDate} type="date" /><Field label="Odometer" value={odometer} onChange={setOdometer} type="number" min={0} /><SelectField label="Payment Method" value={method} onChange={setMethod} options={['Telebirr', 'Cash', 'Bank']} /><Field label="Amount (ETB)" value={amount} onChange={setAmount} type="number" /><SelectField label="Override Reason" value={reason} onChange={setReason} options={['Emergency', 'Operational Need', 'Long Trip', 'Other']} /><Field label="Approved By" value={approvedBy} onChange={setApprovedBy} /><div className="warning-box"><AlertTriangle size={18} /><span>Audit data will include the reason, approving officer, date and time.</span></div></FormShell>;
+  return <FormShell title="Manual Override" subtitle="Register an exceptional fuel decision without destroying the vehicle's normal cycle." onCancel={onCancel} onSubmit={() => v && onSave({ id: Date.now(), date, time: formatTime(), plate: v.plate, vehicle: v.code, odometer: Number(odometer) || 0, amount: Number(amount) || 0, method, reason, timing: 'Manual Override', overrideReason: reason, approvedBy })} submitLabel="Record Override"><SelectField label="Vehicle" value={plate} onChange={setPlate} options={states.map(x => x.plate)} labels={Object.fromEntries(states.map(x => [x.plate, `${x.name} — ${x.plate}`]))} /><Field label="Date" value={date} onChange={setDate} type="date" /><Field label="Odometer" value={odometer} onChange={setOdometer} type="number" min={0} /><SelectField label="Payment Method" value={method} onChange={setMethod} options={['Telebirr', 'Cash', 'Bank']} /><Field label="Amount (ETB)" value={amount} onChange={setAmount} type="number" /><SelectField label="Override Reason" value={reason} onChange={setReason} options={['Emergency', 'Operational Need', 'Long Trip', 'Other']} /><Field label="Approved By" value={approvedBy} onChange={setApprovedBy} /><div className="warning-box"><AlertTriangle size={18} /><span>{translateStatic("Audit data will include the reason, approving officer, date and time.")}</span></div></FormShell>;
 }
 
 function FilledConfirmation({ record, onDone }: { record?: FuelRecord; onDone: () => void }) {
@@ -1576,7 +1672,7 @@ function MonthlyReport({ fuel, states, onSelect }: { fuel: FuelRecord[]; states:
       return;
     }
     const rows = filtered.map((f, i) => { const v = states.find(item => item.plate === f.plate); return `<tr><td>${i + 1}</td><td>${formatDate(f.date)} ${f.time}</td><td>${f.vehicle}</td><td>${v?.name || f.vehicle}</td><td>${v?.phone || ''}</td><td>${f.plate}</td><td>${f.odometer || 0}</td><td>${f.amount.toLocaleString()} ETB</td><td>${f.method}</td><td>${f.timing}</td></tr>`; }).join('');
-    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>OMNI Fleet Fuel Report</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#111}h1{margin:0 0 6px;font-size:22px}p{margin:4px 0 18px;color:#555}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #bbb;padding:7px;text-align:left}th{background:#eee} .summary{display:flex;gap:24px;margin:16px 0;font-weight:700}@media print{body{padding:0}}</style></head><body><h1>OMNI Fleet Fuel Report</h1><p>Report Period: ${reportPeriodLabel}</p><div class="summary"><span>Vehicles: ${states.length}</span><span>Fuel Cost: ${total.toLocaleString()} ETB</span><span>Due Now: ${due}</span><span>Early / Override: ${early}</span></div><table><thead><tr><th>No</th><th>Date</th><th>Vehicle</th><th>Name</th><th>Phone</th><th>Plate</th><th>Odometer</th><th>Amount</th><th>Method</th><th>Timing</th></tr></thead><tbody>${rows || '<tr><td colspan="10">No fuel records for this period.</td></tr>'}</tbody></table><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)};<\\/script></body></html>`);
+    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>{translateStatic("OMNI Fleet Fuel Report")}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#111}h1{margin:0 0 6px;font-size:22px}p{margin:4px 0 18px;color:#555}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #bbb;padding:7px;text-align:left}th{background:#eee} .summary{display:flex;gap:24px;margin:16px 0;font-weight:700}@media print{body{padding:0}}</style></head><body><h1>{translateStatic("OMNI Fleet Fuel Report")}</h1><p>Report Period: ${reportPeriodLabel}</p><div class="summary"><span>Vehicles: ${states.length}</span><span>Fuel Cost: ${total.toLocaleString()} ETB</span><span>Due Now: ${due}</span><span>Early / Override: ${early}</span></div><table><thead><tr><th>{translateStatic("No")}</th><th>{translateStatic("Date")}</th><th>{translateStatic("Vehicle")}</th><th>{translateStatic("Name")}</th><th>{translateStatic("Phone")}</th><th>{translateStatic("Plate")}</th><th>{translateStatic("Odometer")}</th><th>{translateStatic("Amount")}</th><th>{translateStatic("Method")}</th><th>{translateStatic("Timing")}</th></tr></thead><tbody>${rows || '<tr><td colspan="10">{translateStatic("No fuel records for this period.")}</td></tr>'}</tbody></table><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)};<\\/script></body></html>`);
     popup.document.close();
   };
   const periods = ['Daily', 'Weekly', 'Monthly', 'Custom Range'] as const;
@@ -1684,7 +1780,7 @@ function UserManagement({ users, setUsers, onNotify }: { users: UserRecord[]; se
   const toggleStatus = (user: UserRecord) => { setUsers(prev => prev.map(item => item.id === user.id ? { ...item, status: item.status === 'Active' ? 'Blocked' : 'Active' } : item)); setOpenId(null); onNotify(user.status === 'Active' ? 'User blocked' : 'User activated'); };
   const deleteUser = (user: UserRecord) => { if (!window.confirm(`Remove ${user.name}?`)) return; setUsers(prev => prev.filter(item => item.id !== user.id)); setOpenId(null); onNotify('User removed'); };
   const editUser = (user: UserRecord) => { const nextName = window.prompt('Edit user name', user.name); if (nextName === null || !nextName.trim()) return; const nextRole = window.prompt('Edit role: Manager, Supervisor, Data Entry or Viewer', user.role); if (nextRole === null) return; const allowed = ['Manager','Supervisor','Data Entry','Viewer']; const normalized = allowed.includes(nextRole.trim()) ? nextRole.trim() : user.role; setUsers(prev => prev.map(item => item.id === user.id ? { ...item, name: nextName.trim(), role: normalized } : item)); setOpenId(null); onNotify('User updated'); };
-  return <div className="content"><div className="filterbar"><div><h2 className="plain-title">System Users</h2><span className="muted">Manager, Supervisor, Data Entry and Viewer access</span></div><button className="primary" onClick={() => { if (!name.trim()) return; setUsers(prev => [...prev, { id: Date.now(), name: name.trim(), role, status: 'Active' }]); setName(''); onNotify('User added'); }}><Plus size={17} /> Add User</button></div><div className="form-grid"><Field label="New User Name" value={name} onChange={setName} placeholder="Employee name" /><SelectField label="Role" value={role} onChange={setRole} options={['Manager', 'Supervisor', 'Data Entry', 'Viewer']} /></div><div className="table-card"><table><thead><tr><th>#</th><th>Name</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody>{users.map((u, i) => <tr key={u.id}><td>{i + 1}</td><td><strong>{u.name}</strong></td><td>{u.role}</td><td><span className="active-dot">● {u.status}</span></td><td style={{ position: 'relative' }}><button type="button" className="icon-btn" aria-label={`Actions for ${u.name}`} onClick={() => setOpenId(openId === u.id ? null : u.id)}><MoreVertical size={16} /></button>{openId === u.id && <div className="user-action-menu"><button type="button" onClick={() => editUser(u)}><Edit3 size={14} /> Edit</button><button type="button" onClick={() => toggleStatus(u)}>{u.status === 'Active' ? <EyeOff size={14} /> : <Eye size={14} />} {u.status === 'Active' ? 'Block' : 'Activate'}</button><button type="button" onClick={() => deleteUser(u)}><X size={14} /> Remove</button></div>}</td></tr>)}</tbody></table></div></div>;
+  return <div className="content"><div className="filterbar"><div><h2 className="plain-title">{translateStatic("System Users")}</h2><span className="muted">{translateStatic("Manager, Supervisor, Data Entry and Viewer access")}</span></div><button className="primary" onClick={() => { if (!name.trim()) return; setUsers(prev => [...prev, { id: Date.now(), name: name.trim(), role, status: 'Active' }]); setName(''); onNotify('User added'); }}><Plus size={17} /> {translateStatic("Add User")}</button></div><div className="form-grid"><Field label="New User Name" value={name} onChange={setName} placeholder="Employee name" /><SelectField label="Role" value={role} onChange={setRole} options={['Manager', 'Supervisor', 'Data Entry', 'Viewer']} /></div><div className="table-card"><table><thead><tr><th>#</th><th>{translateStatic("Name")}</th><th>{translateStatic("Role")}</th><th>{translateStatic("Status")}</th><th>{translateStatic("Action")}</th></tr></thead><tbody>{users.map((u, i) => <tr key={u.id}><td>{i + 1}</td><td><strong>{u.name}</strong></td><td>{u.role}</td><td><span className="active-dot">● {u.status}</span></td><td style={{ position: 'relative' }}><button type="button" className="icon-btn" aria-label={`Actions for ${u.name}`} onClick={() => setOpenId(openId === u.id ? null : u.id)}><MoreVertical size={16} /></button>{openId === u.id && <div className="user-action-menu"><button type="button" onClick={() => editUser(u)}><Edit3 size={14} /> {translateStatic("Edit")}</button><button type="button" onClick={() => toggleStatus(u)}>{u.status === 'Active' ? <EyeOff size={14} /> : <Eye size={14} />} {u.status === 'Active' ? 'Block' : 'Activate'}</button><button type="button" onClick={() => deleteUser(u)}><X size={14} /> {translateStatic("Remove")}</button></div>}</td></tr>)}</tbody></table></div></div>;
 }
 
 function FormShell({ title, subtitle, children, onCancel, onSubmit, submitLabel = 'Save' }: { title: string; subtitle: string; children: React.ReactNode; onCancel: () => void; onSubmit: () => void; submitLabel?: string }) {
