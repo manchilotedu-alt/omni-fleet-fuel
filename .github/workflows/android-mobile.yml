@@ -61,6 +61,28 @@ jobs:
         run: npm run build
       - name: Add Android platform
         run: npx cap add android
+      - name: Configure stable Android signing when repository secrets are available
+        id: android-signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Stable signing secrets are not configured; the APK can be tested, but releases will not be published."
+            exit 0
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/omni-release.keystore
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path = 'android/app/build.gradle';
+          let text = fs.readFileSync(path, 'utf8');
+          text = text.replace(/buildTypes\\s*\\{\\s*release\\s*\\{/, `signingConfigs { release { storeFile file('omni-release.keystore'); storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD'); keyAlias System.getenv('ANDROID_KEY_ALIAS'); keyPassword System.getenv('ANDROID_KEY_PASSWORD') } }\\n\\nbuildTypes { debug { signingConfig signingConfigs.release } release { signingConfig signingConfigs.release`);
+          fs.writeFileSync(path, text);
+          NODE
+          echo "available=true" >> "$GITHUB_OUTPUT"
       - name: Generate native Android icons and splash screen
         run: npx @capacitor/assets generate --android
       - name: Sync Capacitor
@@ -90,7 +112,7 @@ jobs:
           path: omni-fleet-fuel.apk
           if-no-files-found: error
       - name: Publish versioned Android release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/migration/appdeploy-source'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/migration/appdeploy-source' && steps.android-signing.outputs.available == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.android-version.outputs.version }}
