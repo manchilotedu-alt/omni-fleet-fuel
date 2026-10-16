@@ -79,7 +79,9 @@ jobs:
           import fs from 'node:fs';
           const path = 'android/app/build.gradle';
           let text = fs.readFileSync(path, 'utf8');
-          text = text.replace(/buildTypes\\s*\\{\\s*release\\s*\\{/, `signingConfigs { release { storeFile file('omni-release.keystore'); storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD'); keyAlias System.getenv('ANDROID_KEY_ALIAS'); keyPassword System.getenv('ANDROID_KEY_PASSWORD') } }\\n\\nbuildTypes { debug { signingConfig signingConfigs.release } release { signingConfig signingConfigs.release`);
+          const signingBlock = "signingConfigs { release { storeFile file('omni-release.keystore'); storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD'); keyAlias System.getenv('ANDROID_KEY_ALIAS'); keyPassword System.getenv('ANDROID_KEY_PASSWORD') } }\\n\\nbuildTypes {\\n    debug { signingConfig signingConfigs.release }\\n";
+          text = text.replace('buildTypes {', signingBlock);
+          text = text.replace('    release {', '    release { signingConfig signingConfigs.release');
           fs.writeFileSync(path, text);
           NODE
           echo "available=true" >> "$GITHUB_OUTPUT"
