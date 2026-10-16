@@ -1107,7 +1107,7 @@ function AppContent() {
   };
 
   if (!authReady) {
-    return <div className="auth-loading"><Fuel size={28} /><strong>{t('Checking secure session...')}</strong></div>;
+    return <div className="auth-loading"><img className="auth-loading-logo" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /><strong>{t('Checking secure session...')}</strong></div>;
   }
 
   if (!loggedIn || passwordRecovery) {
@@ -1115,7 +1115,7 @@ function AppContent() {
   }
 
   if (!dataReady) {
-    return <div className="auth-loading"><Fuel size={28} /><strong>{t('Checking secure session...')}</strong></div>;
+    return <div className="auth-loading"><img className="auth-loading-logo" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /><strong>{t('Checking secure session...')}</strong></div>;
   }
 
   const current = selected ? states.find(v => v.id === selected.id) ?? states[0] : states[0];
@@ -1148,7 +1148,7 @@ function AppContent() {
   return (
     <div className={`app-shell ${nightMode ? 'night-mode' : 'day-mode'}`}>
       <header className="topbar">
-        <div className="brand"><Fuel size={24} /><div><strong>{translateStatic("omni-Fleet Fuel Monitoring")}</strong><span>{t('Fuel scheduling & manager decision support')}</span></div></div>
+        <div className="brand"><img className="brand-logo" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /><div><strong>{translateStatic("omni-Fleet Fuel Monitoring")}</strong><span>{t('Fuel scheduling & manager decision support')}</span></div></div>
         <div className="top-actions">
           <button className="top-mode-toggle" type="button" onClick={() => setNightMode(v => !v)} aria-label={nightMode ? 'Turn off night mode' : 'Turn on night mode'} title={nightMode ? 'Turn off night mode' : 'Turn on night mode'}>{nightMode ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button className="language-toggle" type="button" onClick={() => setLang(lang === 'en' ? 'am' : 'en')} aria-label={lang === 'en' ? 'Switch to Amharic' : 'Switch to English'} title={lang === 'en' ? 'አማርኛ' : 'English'}>{lang === 'en' ? 'አማ' : 'EN'}</button>
@@ -1284,7 +1284,7 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
 
   return <div className="login-page"><div className="login-glow login-glow-one" /><div className="login-glow login-glow-two" /><div className="login-shell"><div className="login-card">
     <div className="login-card-top"><button className="login-circle-btn" type="button" aria-label={t('Back')} onClick={() => window.history.back()}><ChevronLeft size={18} /></button><button className="login-circle-btn" type="button" onClick={() => setLang(lang === 'en' ? 'am' : 'en')}>{lang === 'en' ? 'አማ' : 'EN'}</button></div>
-    <div className="login-logo-ring"><div className="login-logo-core"><Fuel size={28} /></div></div>
+    <div className="login-logo-ring"><img className="login-logo-image" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /></div>
     <div className="login-brand"><div className="login-welcome">{resetMode ? t('Request Password Reset') : mode === 'login' ? t('Welcome Back!') : t('Create Your Account')}</div><p>{resetMode ? t('Enter phone, mother name and birth date.') : mode === 'signup' ? t('Create an account with your phone number and recovery details.') : t('Sign in to manage fleet fuel scheduling')}</p></div>
     <form className="login-form" onSubmit={submit}>
       {!resetMode && mode === 'signup' && <>
