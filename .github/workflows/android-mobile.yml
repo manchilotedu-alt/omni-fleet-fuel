@@ -22,6 +22,8 @@ on:
       - migration/appdeploy-source
     paths:
       - 'src/**'
+      - 'assets/**'
+      - 'public/**'
       - 'package.json'
       - 'vite.config.ts'
       - 'capacitor.config.ts'
@@ -72,8 +74,8 @@ jobs:
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const path = 'android/app/build.gradle';
           let text = fs.readFileSync(path, 'utf8');
-          text = text.replace(/versionCode\\s+\\d+/, 'versionCode ' + process.env.GITHUB_RUN_NUMBER);
-          text = text.replace(/versionName\\s+['\"][^'\"]+['\"]/, "versionName '" + pkg.version + "'");
+          text = text.replace(/versionCode\s+\d+/, 'versionCode ' + process.env.GITHUB_RUN_NUMBER);
+          text = text.replace(/versionName\s+['\"][^'\"]+['\"]/, "versionName '" + pkg.version + "'");
           fs.writeFileSync(path, text);
           NODE
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
