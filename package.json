@@ -20,7 +20,8 @@
     "@aparajita/capacitor-biometric-auth": "^9.1.2",
     "@supabase/supabase-js": "^2.57.0",
     "@capacitor/app": "^7.0.1",
-    "@capacitor/app-launcher": "^7.0.1"
+    "@capacitor/app-launcher": "^7.0.1",
+    "@capacitor/splash-screen": "^7.0.1"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.0.0"
