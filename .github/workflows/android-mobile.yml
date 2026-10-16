@@ -1,4 +1,4 @@
-# Rebuild on migration branch updates so current source is validated.
+# Build the Android APK for the migration source and feature branches.
 name: Build Android mobile app
 
 on:
@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - migration/appdeploy-source
+      - feat/home-vehicle-search-monthly-summary
     paths:
       - 'src/**'
       - 'package.json'
@@ -16,6 +17,7 @@ on:
   pull_request:
     branches:
       - main
+      - migration/appdeploy-source
     paths:
       - 'src/**'
       - 'package.json'
