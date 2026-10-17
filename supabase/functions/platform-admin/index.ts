@@ -100,6 +100,8 @@ Deno.serve(async (req: Request) => {
     return error;
   };
 
+  if (action === "status") return reply(200, { allowed: true });
+
   if (action === "list-users") {
     const page = Math.max(1, Math.min(10000, Number(body.page) || 1));
     const perPage = Math.max(1, Math.min(100, Number(body.perPage) || 50));
