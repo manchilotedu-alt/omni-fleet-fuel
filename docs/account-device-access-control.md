@@ -19,6 +19,10 @@ This feature is being developed on `feat/device-and-account-access-control`. The
 
 Devices first seen after the enforcement migration remain pending unless an already-approved administrator approves them. A brand-new self-signup has no approved administrator device yet, so its first device requires a trusted platform-operator approval/provisioning step; do not add a self-approval exception, because that would let a device-block bypass create a new account.
 
+## Coordinated release
+
+The enforcement migration deliberately denies database access to sessions that have not been registered to an approved device and bound to the current Supabase session. Do not apply it separately from the matching Edge Function and client release. Older sideloaded APKs may not send the new device/session fields and may lose access until updated. Build and test the replacement APK, prepare first-device approvals, and rehearse the rollout in a non-production environment before applying either migration to production.
+
 ## Device identity limitation
 
 A sideloaded Android APK cannot reliably prove that two installations before and after a factory reset are the same physical phone using an app-generated UUID alone. Reinstall/reset may erase local identifiers. Unknown registrations must therefore remain pending by default. For a stronger same-physical-device guarantee across factory reset, the deployment needs supported Android Enterprise/MDM device ownership or an appropriate managed-device attestation strategy. Do not advertise a normal sideloaded APK as factory-reset-proof.
