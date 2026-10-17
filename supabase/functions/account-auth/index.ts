@@ -383,6 +383,28 @@ Deno.serve(async (req: Request) => {
         .select("status,reason").eq("user_id", caller.id).maybeSingle();
       if (accountError) return reply(500, { error: "Could not verify account access." });
       if (accountControl?.status === "blocked") return reply(403, { error: accountControl.reason || "This account has been blocked by an administrator." });
+
+      // Enforce trial/payment separately from account and device access. Existing accounts without
+      // a subscription row remain usable during rollout; every Platform Owner-created account
+      // receives a row and must have a valid trial or subscription to access fleet data.
+      const { data: subscription, error: subscriptionError } = await admin
+        .from("platform_user_subscriptions")
+        .select("trial_ends_at,payment_status,paid_through")
+        .eq("user_id", caller.id)
+        .maybeSingle();
+      if (subscriptionError) return reply(500, { error: "Could not verify trial or payment status. Please contact the Platform Owner." });
+      if (subscription) {
+        const today = new Date().toISOString().slice(0, 10);
+        const trialActive = subscription.payment_status === "trial" &&
+          Boolean(subscription.trial_ends_at) &&
+          Date.parse(String(subscription.trial_ends_at)) > Date.now();
+        const paidActive = subscription.payment_status === "paid" &&
+          (!subscription.paid_through || String(subscription.paid_through) >= today);
+        const complimentary = subscription.payment_status === "comped";
+        if (!trialActive && !paidActive && !complimentary) {
+          return reply(403, { error: "Your trial has ended or payment is not active. Contact the OMNI Fleet Fuel Platform Owner to extend access." });
+        }
+      }
       return reply(200, { ok: true });
     }
 
