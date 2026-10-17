@@ -16,6 +16,17 @@ function throwSupabaseError(error: { message?: string; status?: number } | null)
 }
 
 
+
+function currentDeviceId(): string {
+  const key = "omni_ffm_device_id";
+  let id = localStorage.getItem(key) || "";
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
 async function currentUser() {
   const { data, error } = await supabase.auth.getUser();
   throwSupabaseError(error);
@@ -26,6 +37,14 @@ async function currentUser() {
     localStorage.removeItem('omni_ffm_active_session_id');
     await supabase.auth.signOut();
     fail('This account was signed in on another device. Please sign in again.', 401);
+  }
+  const access = await invokeAccountAuth({
+    action: 'access-check',
+    sessionId: localSessionId,
+    deviceId: currentDeviceId(),
+  });
+  if (access?.ok !== true) {
+    fail(access?.message || 'This device is waiting for administrator approval.', 403);
   }
   return data.user;
 }
@@ -50,6 +69,7 @@ function userPayload(user: any) {
     email: isInternalLoginEmail ? '' : email,
     phone: user.phone || user.user_metadata?.phone || '',
     name: user.user_metadata?.full_name || user.user_metadata?.name || user.phone || email || 'Fleet Manager',
+    mustChangePassword: user.app_metadata?.must_change_password === true,
   };
 }
 
@@ -85,6 +105,24 @@ async function invokeAccountAuth(body: Record<string, unknown>): Promise<any> {
   return data;
 }
 
+async function invokePlatformAdmin(body: Record<string, unknown>): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('platform-admin', { body });
+  if (error) {
+    const context = (error as any).context;
+    if (context && typeof context.clone === 'function') {
+      try {
+        const payload = await context.clone().json();
+        fail(payload?.error || error.message || 'Platform Owner request failed.', context.status || 400);
+      } catch (parseError) {
+        if ((parseError as any)?.response) throw parseError;
+      }
+    }
+    fail(error.message || 'Platform Owner request failed.', 400);
+  }
+  if (data?.error) fail(String(data.error), 400);
+  return data;
+}
+
 const emptyState = {
   vehicles: [] as unknown[],
   fuel: [] as unknown[],
@@ -95,6 +133,16 @@ const emptyState = {
 
 export const api = {
   async get(path: string): Promise<ApiResponse<any>> {
+    if (path === '/api/platform-admin/check') {
+      const response = await invokePlatformAdmin({ action: 'status' });
+      return result({ isPlatformOwner: response?.allowed === true });
+    }
+
+    if (path === '/api/platform-admin/users') {
+      const response = await invokePlatformAdmin({ action: 'list-users', page: 1, perPage: 100 });
+      return result({ users: response?.users || [], page: response?.page || 1, total: response?.total ?? null });
+    }
+
     if (path === '/api/auth/me') {
       const user = await currentUser();
       const { data: profile } = await supabase.from('profiles').select('full_name,phone').eq('id', user.id).maybeSingle();
@@ -102,8 +150,21 @@ export const api = {
     }
 
     if (path === '/api/admin/recovery-requests') {
-      const response = await invokeAccountAuth({ action: 'admin-recovery-list' });
+      const response = await invokeAccountAuth({
+        action: 'admin-recovery-list',
+        sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+        deviceId: currentDeviceId(),
+      });
       return result({ requests: response?.requests || [] });
+    }
+
+    if (path === '/api/admin/access-controls') {
+      const response = await invokeAccountAuth({
+        action: 'admin-access-list',
+        sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+        deviceId: currentDeviceId(),
+      });
+      return result({ accounts: response?.accounts || [], devices: response?.devices || [] });
     }
 
     if (path === '/api/fleet-data') {
@@ -122,24 +183,66 @@ export const api = {
   },
 
   async post(path: string, body: any = {}): Promise<ApiResponse<any>> {
+    if (path === '/api/auth/change-password') {
+      const response = await invokeAccountAuth({
+        action: 'change-password',
+        sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+        deviceId: currentDeviceId(),
+        currentPassword: String(body.currentPassword || ''),
+        newPassword: String(body.newPassword || ''),
+      });
+      return result(response || { ok: true });
+    }
+
+    if (path === '/api/platform-admin') {
+      const response = await invokePlatformAdmin(body);
+      return result(response || { ok: true });
+    }
+
     if (path === '/api/admin/recovery-requests/resolve') {
       const response = await invokeAccountAuth({
         action: 'admin-recovery-resolve',
+        sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+        deviceId: currentDeviceId(),
         requestId: String(body.requestId || ''),
         newPassword: String(body.newPassword || ''),
       });
       return result({ ok: true, message: response?.message || 'Password reset completed.' });
     }
 
+    if (path === '/api/admin/access-controls') {
+      const response = await invokeAccountAuth({
+        action: 'admin-access-set',
+        sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+        deviceId: currentDeviceId(),
+        kind: String(body.kind || ''),
+        targetId: String(body.targetId || ''),
+        operation: String(body.operation || ''),
+        reason: String(body.reason || ''),
+      });
+      return result({ ok: true, message: response?.message || 'Access status updated.' });
+    }
+
     if (path === '/api/auth/logout') {
+      try {
+        await invokeAccountAuth({
+          action: 'deactivate-session',
+          sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+          deviceId: currentDeviceId(),
+        });
+      } catch {
+        // Continue local sign-out even if the server cannot be reached.
+      }
       const { error } = await supabase.auth.signOut();
       throwSupabaseError(error);
+      localStorage.removeItem('omni_ffm_active_session_id');
       return result({ ok: true });
     }
 
     if (path === '/api/auth/signup') {
       await invokeAccountAuth({
         action: 'signup',
+        deviceId: currentDeviceId(),
         phone: body.phone,
         password: String(body.password || ''),
         fullName: String(body.name || '').trim(),
@@ -156,14 +259,21 @@ export const api = {
       throwSupabaseError(error);
       if (!data.user) fail('The account was created, but sign-in could not be completed. Please sign in manually.', 401);
       const sessionId = crypto.randomUUID();
-      await invokeAccountAuth({ action: 'activate-session', sessionId });
+      const activation = await invokeAccountAuth({ action: 'activate-session', sessionId, deviceId: currentDeviceId(), deviceLabel: 'OMNI Fleet Fuel app' });
+      if (activation?.deviceStatus !== 'approved') {
+        await supabase.auth.signOut();
+        localStorage.removeItem('omni_ffm_active_session_id');
+        fail('This device is waiting for administrator approval. An existing approved administrator or platform support must approve it before you can continue.', 403);
+      }
       localStorage.setItem('omni_ffm_active_session_id', sessionId);
-      return result({ user: userPayload(data.user) });
+      const refreshedSession = await supabase.auth.refreshSession();
+      throwSupabaseError(refreshedSession.error);
+      return result({ user: userPayload(refreshedSession.data.user || data.user) });
     }
 
     if (path === '/api/auth/login') {
       const phone = normalizePhone(body.phone);
-      await invokeAccountAuth({ action: 'prepare-login', phone });
+      await invokeAccountAuth({ action: 'prepare-login', phone, deviceId: currentDeviceId() });
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmailForPhone(phone),
         password: String(body.password || ''),
@@ -174,7 +284,12 @@ export const api = {
       }
       if (!data.user) fail('Sign-in was not accepted. Check the phone number and password.', 401);
       const sessionId = crypto.randomUUID();
-      await invokeAccountAuth({ action: 'activate-session', sessionId });
+      const activation = await invokeAccountAuth({ action: 'activate-session', sessionId, deviceId: currentDeviceId(), deviceLabel: 'OMNI Fleet Fuel app' });
+      if (activation?.deviceStatus !== 'approved') {
+        await supabase.auth.signOut();
+        localStorage.removeItem('omni_ffm_active_session_id');
+        fail('This device is waiting for administrator approval. An existing approved administrator or platform support must approve it before you can continue.', 403);
+      }
       localStorage.setItem('omni_ffm_active_session_id', sessionId);
       return result({ user: userPayload(data.user) });
     }

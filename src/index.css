@@ -2360,3 +2360,71 @@ body { background: #081326; color: #F8FAFC; }
 .update-brand-mark { background:#FBBF24 !important; color:#10213D !important; box-shadow:0 0 24px rgba(251,191,36,.18) !important; }
 .update-dialog h2 { color:#F8FAFC !important; }
 .update-dialog p { color:#B8C5D8 !important; }
+
+
+/* Account/device access control admin view */
+.access-control-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--border, #dce5ee);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+}
+.access-control-panel .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.access-control-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 0;
+  border-top: 1px solid rgba(128, 145, 164, 0.22);
+}
+.access-control-list-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.access-control-list-main small {
+  overflow-wrap: anywhere;
+  color: #728196;
+  font-size: 12px;
+}
+.access-control-list-main .access-blocked {
+  color: #bd3030;
+}
+.access-control-danger {
+  border: 1px solid #d94b4b;
+  color: #b42323;
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.access-control-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 11px 13px;
+  border: 1px solid #f0b7b7;
+  border-radius: 9px;
+  color: #a52b2b;
+  background: #fff4f4;
+}
+.access-control-loading {
+  padding: 24px 0;
+  color: #728196;
+}
+@media (max-width: 600px) {
+  .access-control-panel { padding: 13px; }
+  .access-control-list-row { align-items: flex-start; flex-direction: column; }
+  .access-control-list-row button { width: 100%; }
+}

@@ -29,6 +29,8 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldCheck,
+  Smartphone,
   UserCog,
   UserCircle,
   Wrench,
@@ -42,7 +44,7 @@ import * as React from 'react';
 
 type Lang = 'en' | 'am';
 const APP_VERSION = '1.0.1';
-type AppUser = { id: string; email: string; name: string; phone?: string };
+type AppUser = { id: string; email: string; name: string; phone?: string; mustChangePassword?: boolean };
 
 const translations: Record<string, string> = {
   'Dashboard': 'ዳሽቦርድ',
@@ -121,6 +123,15 @@ const translations: Record<string, string> = {
   'Photo must be 2 MB or smaller.': 'ፎቶው 2 MB ወይም ከዚያ በታች መሆን አለበት።',
   'User Management': 'የተጠቃሚዎች አስተዳደር',
   'Recovery Requests': 'የመለያ መመለሻ ጥያቄዎች',
+  'Access Controls': 'የመግቢያ ቁጥጥር',
+  'Account and Device Access': 'የአካውንትና ስልክ መግቢያ ቁጥጥር',
+  'Blocked': 'ታግዷል',
+  'Approved': 'ተፈቅዷል',
+  'Pending': 'በመጠባበቅ ላይ',
+  'Block account': 'አካውንት አግድ',
+  'Unblock account': 'አካውንት እገዳ አንሳ',
+  'Block device': 'ስልክ አግድ',
+  'Approve device': 'ስልክ ፍቀድ',
   'Pending recovery requests': 'በመጠባበቅ ላይ ያሉ የመለያ መመለሻ ጥያቄዎች',
   'Refresh': 'አድስ',
   'New password for this user': 'ለዚህ ተጠቃሚ አዲስ የይለፍ ቃል',
@@ -800,6 +811,7 @@ function AppContent() {
   // Translation is rendered through React's t() helper. Do not mutate React-managed DOM with a MutationObserver because external text/attribute changes can conflict with React reconciliation and cause page render failures.
   const [authReady, setAuthReady] = useState(false);
   const [authUser, setAuthUser] = useState<AppUser | null>(null);
+  const [isPlatformOwner, setIsPlatformOwner] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(() => localStorage.getItem('omni_ffm_biometric_enabled') === '1');
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [active, setActive] = useState('Dashboard');
@@ -901,6 +913,18 @@ function AppContent() {
   }, []);
 
   const loggedIn = Boolean(authUser);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!authUser) {
+      setIsPlatformOwner(false);
+      return () => { mounted = false; };
+    }
+    void api.get('/api/platform-admin/check')
+      .then(response => { if (mounted) setIsPlatformOwner(response.data?.isPlatformOwner === true); })
+      .catch(() => { if (mounted) setIsPlatformOwner(false); });
+    return () => { mounted = false; };
+  }, [authUser?.id]);
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -1115,6 +1139,10 @@ function AppContent() {
     return <Login initialRecovery={passwordRecovery} onRecoveryComplete={() => setPasswordRecovery(false)} lang={lang} setLang={setLang} onLogin={user => { localStorage.setItem('omni_ffm_last_name', user.name); sessionStorage.setItem('omni_ffm_session_open', '1'); setAuthUser(user); }} />;
   }
 
+  if (authUser?.mustChangePassword) {
+    return <PasswordChangeGate onComplete={() => { setAuthUser(null); setIsPlatformOwner(false); }} />;
+  }
+
   if (!dataReady) {
     return <div className="auth-loading"><img className="auth-loading-logo" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /><strong>{t('Checking secure session...')}</strong></div>;
   }
@@ -1143,6 +1171,7 @@ function AppContent() {
     Settings: <SettingsPage settings={settings} onSave={next => { setSettings(next); notify('Settings saved'); }} biometricEnabled={biometricEnabled} onToggleBiometric={toggleBiometric} />,
     'User Management': <UserManagement users={users} setUsers={setUsers} onNotify={notify} />,
     'Recovery Requests': <RecoveryRequestsPage onNotify={notify} />,
+    'Access Controls': <AccessControlsPage onNotify={notify} />,
     Profile: <ProfilePage user={authUser} photo={profilePhoto} onPhotoChange={setProfilePhoto} onNavigate={navigate} onNotify={notify} />,
   };
 
@@ -1169,8 +1198,11 @@ function AppContent() {
         <div className="nav-sep" />
         <NavItem icon={<UserCircle />} label={t('Profile')} active={active === 'Profile'} onClick={() => navigate('Profile')} />
         <NavItem icon={<Settings />} label={t('Settings')} active={active === 'Settings'} onClick={() => navigate('Settings')} />
-        <NavItem icon={<UserCog />} label={t('User Management')} active={active === 'User Management'} onClick={() => navigate('User Management')} />
-        <NavItem icon={<KeyRound />} label={t('Recovery Requests')} active={active === 'Recovery Requests'} onClick={() => navigate('Recovery Requests')} />
+        {isPlatformOwner && <>
+          <NavItem icon={<UserCog />} label={t('User Management')} active={active === 'User Management'} onClick={() => navigate('User Management')} />
+          <NavItem icon={<KeyRound />} label={t('Recovery Requests')} active={active === 'Recovery Requests'} onClick={() => navigate('Recovery Requests')} />
+          <NavItem icon={<ShieldCheck />} label={t('Access Controls')} active={active === 'Access Controls'} onClick={() => navigate('Access Controls')} />
+        </>}
       </aside>
       <main className="main">
         <div className="page-head"><div><div className="crumb">{translateStatic("omni-Fleet")} <span>/</span> {t(active === 'Dashboard' ? 'Home' : active)}</div><h1>{t(active === 'Dashboard' ? 'Home' : active)}</h1></div><div className="head-actions">{active === 'Vehicle List' && <button className="primary" onClick={() => navigate('Add Vehicle')}><Plus size={17} /> Add Vehicle</button>}{active === 'Dashboard' && <button className="outline" onClick={() => navigate('Reports')}><FileText size={16} /> {t('View Report')}</button>}</div></div>
@@ -1307,7 +1339,7 @@ function Login({ onLogin, lang, setLang, initialRecovery = false, onRecoveryComp
       <button className="login-btn" type="submit" disabled={busy || (!resetMode && !phone.trim()) || (resetMode && (!recoveryPhone.trim() || !recoveryMother.trim() || !recoveryBirthDate)) || (!resetMode && password.length < 8) || (mode === 'signup' && (!name.trim() || !motherName.trim() || !fatherName.trim() || !birthDate || !confirm || password !== confirm))}><span>{busy ? t('Checking...') : resetMode ? t('Request Password Reset') : mode === 'login' ? t('Sign In') : t('Create Account')}</span><ChevronRight size={18} /></button>
       {errorMessage && <div className="login-error">{errorMessage}</div>}
       {noticeMessage && <div className="login-success" role="status">{noticeMessage}</div>}
-      <div className="login-create"><span>{resetMode ? t('Remembered your password?') : mode === 'login' ? t('Create Your Account?') : t('Already have an account?')}</span><button type="button" className="login-link strong" onClick={() => resetMode ? switchMode('login') : switchMode(mode === 'login' ? 'signup' : 'login')}>{resetMode ? t('Sign In') : mode === 'login' ? t('Sign up') : t('Sign In')}</button></div>
+      <div className="login-create"><span>{resetMode ? t('Remembered your password?') : t('Need an account? Contact the Platform Owner.')}</span><button type="button" className="login-link strong" onClick={() => { if (resetMode) { switchMode('login'); } else { setNoticeMessage(t('Accounts are created by the OMNI Fleet Fuel Platform Owner. Please contact them to receive your login details.')); setErrorMessage(''); } }}>{resetMode ? t('Sign In') : t('Contact Platform Owner')}</button></div>
     </form>
     <div className="login-secure-note"><CheckCircle2 size={15} /><span>{t('Your account information is stored securely by the app server.')}</span></div>
     <div className="login-language login-language-bottom"><button className={lang === 'am' ? 'selected-language' : ''} onClick={() => setLang('am')}>አማርኛ</button><span>·</span><button className={lang === 'en' ? 'selected-language' : ''} onClick={() => setLang('en')}>{translateStatic("English")}</button></div>
@@ -1700,6 +1732,71 @@ function SettingsPage({ settings, onSave, biometricEnabled, onToggleBiometric }:
   return <div className="content"><div className="settings-card"><h2>{t('Fuel Scheduling Rules')}</h2><p className="muted">{t('The system uses management-supplied data. Sundays are excluded by default and vehicle-specific off-days can be registered.')}</p><SelectField label="Default Currency" value={draft.currency} onChange={value => setDraft(prev => ({ ...prev, currency: value as AppSettings['currency'] }))} options={['ETB (Birr)', 'USD']} /><label className="check"><input type="checkbox" checked={draft.sundayOff} onChange={e => setDraft(prev => ({ ...prev, sundayOff: e.target.checked }))} /> {t('Sunday as Off-Day (default)')}</label><label className="check"><input type="checkbox" checked={draft.customOffDays} onChange={e => setDraft(prev => ({ ...prev, customOffDays: e.target.checked }))} /> {t('Enable custom off-days')}</label><label className="check"><input type="checkbox" checked={draft.requireManualApproval} onChange={e => setDraft(prev => ({ ...prev, requireManualApproval: e.target.checked }))} /> {t('Require approval for Manual Override')}</label><button type="button" className="primary" onClick={() => onSave(draft)}>{t('Save Settings')}</button><div className="settings-security"><h2>{t('Biometric Unlock')}</h2><p className="muted">{t('Use Face ID or Fingerprint to unlock this app on this device.')}</p><button type="button" className="primary" onClick={onToggleBiometric}>{t(biometricEnabled ? 'Disable biometric unlock' : 'Enable biometric unlock')}</button></div></div></div>;
 }
 
+
+type AccessAccount = { id: string; full_name?: string; phone?: string; role: string; status: 'active' | 'blocked'; reason?: string };
+type AccessDevice = { id: string; status: 'pending' | 'approved' | 'blocked'; device_label?: string; reason?: string; user_id: string; user_name?: string; last_seen_at?: string };
+
+function AccessControlsPage({ onNotify }: { onNotify: (message: string) => void }) {
+  const { t } = useLanguage();
+  const [accounts, setAccounts] = useState<AccessAccount[]>([]);
+  const [devices, setDevices] = useState<AccessDevice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    setLoading(true); setError('');
+    try {
+      const response = await api.get('/api/admin/access-controls');
+      setAccounts((response.data.accounts || []) as AccessAccount[]);
+      setDevices((response.data.devices || []) as AccessDevice[]);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Could not load access controls.');
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, []);
+
+  const change = async (kind: 'account' | 'device', targetId: string, operation: 'block' | 'unblock' | 'approve') => {
+    const label = kind === 'account' ? 'account' : 'device';
+    const reason = operation === 'block' ? window.prompt(`Reason for blocking this ${label} (optional):`) || '' : '';
+    if (operation === 'block' && !window.confirm(`Block this ${label}? Existing user and fleet data will not be deleted.`)) return;
+    setBusy(targetId); setError('');
+    try {
+      const response = await api.post('/api/admin/access-controls', { kind, targetId, operation, reason });
+      onNotify(response.data.message || 'Access status updated.');
+      await load();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Could not update access status.');
+    } finally { setBusy(''); }
+  };
+
+  const uniqueDevices = [...new Map<string, AccessDevice>(devices.map(device => [device.id, device] as [string, AccessDevice])).values()];
+  return <div className="content">
+    <div className="filterbar">
+      <div><h2 className="plain-title">{t('Account and Device Access')}</h2><span className="muted">Account blocks apply on every phone. Device blocks apply to every account on that phone.</span></div>
+      <button type="button" className="outline" onClick={() => void load()} disabled={loading}>Refresh</button>
+    </div>
+    {error && <div className="access-control-error"><AlertTriangle size={17} /> {error}</div>}
+    {loading ? <div className="access-control-loading">Loading access records…</div> : <>
+      <section className="access-control-panel">
+        <div className="section-title"><UserCog size={18} /><h2>Accounts</h2></div>
+        {accounts.length === 0 ? <p className="muted">No organization accounts found.</p> : accounts.map(account => <div className="access-control-list-row" key={account.id}>
+          <div className="access-control-list-main"><strong>{account.full_name || account.phone || account.id}</strong><small>{account.phone || ''} · {account.role}</small><small className={account.status === 'blocked' ? 'access-blocked' : 'muted'}>{account.status === 'blocked' ? 'Blocked' : 'Active'}{account.reason ? ` · ${account.reason}` : ''}</small></div>
+          <button type="button" className={account.status === 'blocked' ? 'outline' : 'access-control-danger'} disabled={busy === account.id} onClick={() => void change('account', account.id, account.status === 'blocked' ? 'unblock' : 'block')}>{busy === account.id ? 'Please wait…' : account.status === 'blocked' ? 'Unblock' : 'Block account'}</button>
+        </div>)}
+      </section>
+      <section className="access-control-panel">
+        <div className="section-title"><Smartphone size={18} /><h2>Registered devices</h2></div>
+        {uniqueDevices.length === 0 ? <p className="muted">No devices have registered yet. Devices appear after a user signs in.</p> : uniqueDevices.map(device => <div className="access-control-list-row" key={device.id}>
+          <div className="access-control-list-main"><strong>{device.device_label || 'Registered device'}</strong><small>{device.user_name || 'Fleet user'}{device.last_seen_at ? ` · Last seen ${new Date(device.last_seen_at).toLocaleString()}` : ''}</small><small className={device.status === 'blocked' ? 'access-blocked' : 'muted'}>{device.status}{device.reason ? ` · ${device.reason}` : ''}</small></div>
+          <button type="button" className={device.status === 'blocked' ? 'outline' : 'access-control-danger'} disabled={busy === device.id} onClick={() => void change('device', device.id, device.status === 'blocked' ? 'unblock' : device.status === 'pending' ? 'approve' : 'block')}>{busy === device.id ? 'Please wait…' : device.status === 'blocked' ? 'Unblock device' : device.status === 'pending' ? 'Approve device' : 'Block device'}</button>
+        </div>)}
+      </section>
+      <div className="settings-security"><ShieldCheck size={18} /><span>Blocking does not delete the account, memberships, vehicles, fuel history, or organization data.</span></div>
+    </>}
+  </div>;
+}
+
 type RecoveryRequest = {
   id: string;
   user_id: string;
@@ -1773,14 +1870,217 @@ function RecoveryRequestsPage({ onNotify }: { onNotify: (message: string) => voi
   </div>;
 }
 
-function UserManagement({ users, setUsers, onNotify }: { users: UserRecord[]; setUsers: React.Dispatch<React.SetStateAction<UserRecord[]>>; onNotify: (s: string) => void }) {
+function PasswordChangeGate({ onComplete }: { onComplete: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setNotice('');
+    if (newPassword.length < 12 || newPassword.length > 128) {
+      setError('Choose a new password containing 12–128 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('The new passwords do not match.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setError('Choose a password different from the temporary password.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post('/api/auth/change-password', { currentPassword, newPassword });
+      await api.post('/api/auth/logout');
+      setNotice('Password changed. Sign in again with your new password.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      onComplete();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Password change failed. Please try again.');
+    } finally { setBusy(false); }
+  };
+
+  return <div className="login-page"><div className="login-shell"><div className="login-card">
+    <div className="login-logo-ring"><img className="login-logo-image" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /></div>
+    <div className="login-brand"><div className="login-welcome">Change your temporary password</div><p>You must choose a new password before using OMNI Fleet Fuel.</p></div>
+    <form className="login-form" onSubmit={submit}>
+      <label className="login-field"><span>Temporary / current password</span><div className="login-input-shell"><input value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} type="password" autoComplete="current-password" minLength={8} maxLength={128} required /></div></label>
+      <label className="login-field"><span>New password</span><div className="login-input-shell"><input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></div></label>
+      <label className="login-field"><span>Confirm new password</span><div className="login-input-shell"><input value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></div></label>
+      {error && <div className="login-error" role="alert">{error}</div>}
+      {notice && <div className="login-notice" role="status">{notice}</div>}
+      <button className="primary login-submit" type="submit" disabled={busy}>{busy ? 'Changing password…' : 'Change password and continue'}</button>
+    </form>
+  </div></div></div>;
+}
+
+function UserManagement({ onNotify }: { users?: UserRecord[]; setUsers?: React.Dispatch<React.SetStateAction<UserRecord[]>>; onNotify: (s: string) => void }) {
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('Viewer');
-  const [openId, setOpenId] = useState<number | null>(null);
-  const toggleStatus = (user: UserRecord) => { setUsers(prev => prev.map(item => item.id === user.id ? { ...item, status: item.status === 'Active' ? 'Blocked' : 'Active' } : item)); setOpenId(null); onNotify(user.status === 'Active' ? 'User blocked' : 'User activated'); };
-  const deleteUser = (user: UserRecord) => { if (!window.confirm(`Remove ${user.name}?`)) return; setUsers(prev => prev.filter(item => item.id !== user.id)); setOpenId(null); onNotify('User removed'); };
-  const editUser = (user: UserRecord) => { const nextName = window.prompt('Edit user name', user.name); if (nextName === null || !nextName.trim()) return; const nextRole = window.prompt('Edit role: Manager, Supervisor, Data Entry or Viewer', user.role); if (nextRole === null) return; const allowed = ['Manager','Supervisor','Data Entry','Viewer']; const normalized = allowed.includes(nextRole.trim()) ? nextRole.trim() : user.role; setUsers(prev => prev.map(item => item.id === user.id ? { ...item, name: nextName.trim(), role: normalized } : item)); setOpenId(null); onNotify('User updated'); };
-  return <div className="content"><div className="filterbar"><div><h2 className="plain-title">{translateStatic("System Users")}</h2><span className="muted">{translateStatic("Manager, Supervisor, Data Entry and Viewer access")}</span></div><button className="primary" onClick={() => { if (!name.trim()) return; setUsers(prev => [...prev, { id: Date.now(), name: name.trim(), role, status: 'Active' }]); setName(''); onNotify('User added'); }}><Plus size={17} /> {translateStatic("Add User")}</button></div><div className="form-grid"><Field label="New User Name" value={name} onChange={setName} placeholder="Employee name" /><SelectField label="Role" value={role} onChange={setRole} options={['Manager', 'Supervisor', 'Data Entry', 'Viewer']} /></div><div className="table-card"><table><thead><tr><th>#</th><th>{translateStatic("Name")}</th><th>{translateStatic("Role")}</th><th>{translateStatic("Status")}</th><th>{translateStatic("Action")}</th></tr></thead><tbody>{users.map((u, i) => <tr key={u.id}><td>{i + 1}</td><td><strong>{u.name}</strong></td><td>{u.role}</td><td><span className="active-dot">● {u.status}</span></td><td style={{ position: 'relative' }}><button type="button" className="icon-btn" aria-label={`Actions for ${u.name}`} onClick={() => setOpenId(openId === u.id ? null : u.id)}><MoreVertical size={16} /></button>{openId === u.id && <div className="user-action-menu"><button type="button" onClick={() => editUser(u)}><Edit3 size={14} /> {translateStatic("Edit")}</button><button type="button" onClick={() => toggleStatus(u)}>{u.status === 'Active' ? <EyeOff size={14} /> : <Eye size={14} />} {u.status === 'Active' ? 'Block' : 'Activate'}</button><button type="button" onClick={() => deleteUser(u)}><X size={14} /> {translateStatic("Remove")}</button></div>}</td></tr>)}</tbody></table></div></div>;
+  const [phone, setPhone] = useState('');
+  const [alternatePhone, setAlternatePhone] = useState('');
+  const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [trialDays, setTrialDays] = useState('30');
+
+  const loadAccounts = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get('/api/platform-admin/users');
+      setAccounts(response.data.users || []);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not load Platform Owner accounts.';
+      setError(message);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { void loadAccounts(); }, []);
+
+  const perform = async (payload: Record<string, unknown>, success: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.post('/api/platform-admin', payload);
+      onNotify(success);
+      await loadAccounts();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The request could not be completed.');
+    } finally { setBusy(false); }
+  };
+
+  const createAccount = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !phone.trim() || temporaryPassword.length < 12) {
+      setError('Enter the full name, main phone and a temporary password of at least 12 characters.');
+      return;
+    }
+    const days = Number(trialDays);
+    if (!Number.isInteger(days) || days < 0 || days > 3650) {
+      setError('Trial days must be a whole number from 0 to 3650.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await api.post('/api/platform-admin', {
+        action: 'create-user',
+        fullName: name.trim(),
+        phone: phone.trim(),
+        alternatePhone: alternatePhone.trim(),
+        temporaryPassword,
+        trialDays: days,
+      });
+      setName('');
+      setPhone('');
+      setAlternatePhone('');
+      setTemporaryPassword('');
+      setTrialDays('30');
+      onNotify('User account created. Share the temporary password securely; it cannot be retrieved from this screen.');
+      await loadAccounts();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The account could not be created.');
+    } finally { setBusy(false); }
+  };
+
+  const resetPassword = (account: any) => {
+    const password = window.prompt(`Enter a new temporary password for ${account.profile?.full_name || 'this user'} (12 characters minimum). Do not use a password they have used before.`);
+    if (password === null) return;
+    if (password.length < 12) { setError('The temporary password must contain at least 12 characters.'); return; }
+    void perform({ action: 'reset-user-password', userId: account.id, temporaryPassword: password }, 'Temporary password set. The user must change it after sign-in.');
+  };
+
+  const setPayment = (account: any, paymentStatus: string) => {
+    let paidThrough: string | undefined;
+    if (paymentStatus === 'paid') {
+      const raw = window.prompt(
+        'Paid through date (YYYY-MM-DD; required):',
+        String(account.subscription?.paid_through || ''),
+      );
+      if (raw === null) return;
+      const candidate = raw.trim();
+      const parsed = /^\d{4}-\d{2}-\d{2}$/.test(candidate) ? new Date(candidate + 'T00:00:00Z') : null;
+      if (!candidate || !parsed || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== candidate) {
+        setError('Enter a valid paid-through date in YYYY-MM-DD format.');
+        return;
+      }
+      if (candidate < new Date().toISOString().slice(0, 10)) {
+        setError('The paid-through date must be today or a future date.');
+        return;
+      }
+      paidThrough = candidate;
+    }
+    void perform({
+      action: 'set-subscription',
+      userId: account.id,
+      paymentStatus,
+      ...(paidThrough ? { paidThrough } : {}),
+    }, paymentStatus === 'paid' ? `Paid access recorded through ${paidThrough}.` : `Payment status changed to ${paymentStatus}.`);
+  };
+
+  const toggleAccount = (account: any) => {
+    const blocked = account.account_access?.status === 'blocked';
+    const reason = blocked ? '' : window.prompt('Reason for blocking this account (required):') || '';
+    if (!blocked && reason.trim().length < 3) return;
+    void perform({ action: 'set-account-access', userId: account.id, operation: blocked ? 'unblock' : 'block', reason }, blocked ? 'Account access restored.' : 'Account access blocked. Fleet data remains preserved.');
+  };
+
+  const extendTrial = (account: any) => {
+    const raw = window.prompt('Set a new trial duration in days from today (0 to end the trial now):', '30');
+    if (raw === null) return;
+    const days = Number(raw);
+    if (!Number.isInteger(days) || days < 0 || days > 3650) { setError('Trial duration must be a whole number from 0 to 3650.'); return; }
+    void perform({ action: 'set-subscription', userId: account.id, paymentStatus: 'trial', trialDays: days }, 'Trial period updated.');
+  };
+
+  return <div className="content">
+    <div className="filterbar"><div><h2 className="plain-title">Platform Owner — User Accounts</h2><span className="muted">Create accounts, manage trial/payment state, and control account access. Device access is managed separately.</span></div><button type="button" className="outline" disabled={loading || busy} onClick={() => void loadAccounts()}><History size={16} /> Refresh</button></div>
+    <form className="form-card" onSubmit={createAccount}>
+      <div className="form-title"><div><h2>Create User Account</h2><p>Only the Platform Owner can create accounts. Passwords are never stored in application tables.</p></div></div>
+      <div className="form-grid">
+        <label className="field"><span>Full name *</span><input value={name} onChange={e => setName(e.target.value)} autoComplete="name" maxLength={120} required /></label>
+        <label className="field"><span>Main phone *</span><input value={phone} onChange={e => setPhone(e.target.value)} type="tel" autoComplete="tel" placeholder="09XXXXXXXX or +2519XXXXXXXX" maxLength={24} required /></label>
+        <label className="field"><span>Alternate phone (optional)</span><input value={alternatePhone} onChange={e => setAlternatePhone(e.target.value)} type="tel" maxLength={24} placeholder="Optional second number" /></label>
+        <label className="field"><span>Temporary password *</span><input value={temporaryPassword} onChange={e => setTemporaryPassword(e.target.value)} type="password" autoComplete="new-password" minLength={12} maxLength={128} required /><small>At least 12 characters. Share it securely; it is not retrievable later.</small></label>
+        <label className="field"><span>Trial duration (days)</span><input value={trialDays} onChange={e => setTrialDays(e.target.value)} type="number" min={0} max={3650} step={1} required /></label>
+      </div>
+      <div className="form-actions"><button className="primary" type="submit" disabled={busy}><Plus size={16} /> {busy ? 'Working…' : 'Create Account'}</button></div>
+    </form>
+    {error && <div className="notice error" role="alert">{error}</div>}
+    <div className="table-card"><table><thead><tr><th>User</th><th>Main phone</th><th>Trial / payment</th><th>Account access</th><th>Actions</th></tr></thead>
+      <tbody>{accounts.map(account => {
+        const profile = account.profile || {};
+        const subscription = account.subscription || {};
+        const blocked = account.account_access?.status === 'blocked';
+        const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at).toLocaleDateString() : 'Not set';
+        return <tr key={account.id}>
+          <td><strong>{profile.full_name || 'Unnamed user'}</strong><div className="muted">{account.must_change_password ? 'Must change password' : 'Password status normal'}</div></td>
+          <td>{profile.phone || '—'}{profile.alternate_phone && <div className="muted">Alt: {profile.alternate_phone}</div>}</td>
+          <td><strong>{subscription.payment_status || 'unpaid'}</strong><div className="muted">Trial ends: {trialEnd}</div><div className="muted">Paid through: {subscription.paid_through || 'Not set'}</div></td>
+          <td><span className={blocked ? 'status-pill blocked' : 'status-pill active'}>{blocked ? 'Blocked' : 'Active'}</span>{blocked && subscription.access_note && <div className="muted">{subscription.access_note}</div>}</td>
+          <td><div className="user-row-actions">
+            <button type="button" className="outline" disabled={busy} onClick={() => toggleAccount(account)}>{blocked ? 'Restore' : 'Block account'}</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => setPayment(account, 'paid')}>Mark paid</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => setPayment(account, 'unpaid')}>Mark unpaid</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => setPayment(account, 'comped')}>Complimentary</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => extendTrial(account)}>Set trial</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => resetPassword(account)}>Reset password</button>
+          </div></td>
+        </tr>;
+      })}{!accounts.length && <tr><td colSpan={5}>{loading ? 'Loading accounts…' : 'No user accounts returned.'}</td></tr>}</tbody>
+    </table></div>
+    <p className="muted">Blocking an account does not delete its organization, vehicles, or fuel history. Payment status and device status are independent. Paid access requires a paid-through date; complimentary access is managed separately.</p>
+  </div>;
 }
 
 function FormShell({ title, subtitle, children, onCancel, onSubmit, submitLabel = 'Save' }: { title: string; subtitle: string; children: React.ReactNode; onCancel: () => void; onSubmit: () => void; submitLabel?: string }) {

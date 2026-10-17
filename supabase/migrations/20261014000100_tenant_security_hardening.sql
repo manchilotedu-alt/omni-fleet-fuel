@@ -12,10 +12,12 @@ create index if not exists fuel_events_created_by_idx on public.fuel_events(crea
 create index if not exists vehicle_off_days_created_by_idx on public.vehicle_off_days(created_by);
 create index if not exists organization_settings_updated_by_idx on public.organization_settings(updated_by);
 create index if not exists audit_logs_actor_user_idx on public.audit_logs(actor_user_id);
-do $ begin if not exists (select 1 from pg_constraint where conname = 'vehicles_id_org_unique' and conrelid = 'public.vehicles'::regclass) then alter table public.vehicles add constraint vehicles_id_org_unique unique (id, organization_id); end if; end $;
-alter table public.fuel_events drop constraint if exists fuel_events_vehicle_id_fkey;\nalter table public.fuel_events drop constraint if exists fuel_events_vehicle_org_fkey;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'vehicles_id_org_unique' and conrelid = 'public.vehicles'::regclass) then alter table public.vehicles add constraint vehicles_id_org_unique unique (id, organization_id); end if; end $$;
+alter table public.fuel_events drop constraint if exists fuel_events_vehicle_id_fkey;
+alter table public.fuel_events drop constraint if exists fuel_events_vehicle_org_fkey;
 alter table public.fuel_events add constraint fuel_events_vehicle_org_fkey foreign key (vehicle_id, organization_id) references public.vehicles(id, organization_id) on delete cascade;
-alter table public.vehicle_off_days drop constraint if exists vehicle_off_days_vehicle_id_fkey;\nalter table public.vehicle_off_days drop constraint if exists vehicle_off_days_vehicle_org_fkey;
+alter table public.vehicle_off_days drop constraint if exists vehicle_off_days_vehicle_id_fkey;
+alter table public.vehicle_off_days drop constraint if exists vehicle_off_days_vehicle_org_fkey;
 alter table public.vehicle_off_days add constraint vehicle_off_days_vehicle_org_fkey foreign key (vehicle_id, organization_id) references public.vehicles(id, organization_id) on delete cascade;
 create or replace function public.bootstrap_new_user()
 returns trigger language plpgsql security definer set search_path = public
