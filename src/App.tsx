@@ -2014,6 +2014,10 @@ function UserManagement({ onNotify }: { users?: UserRecord[]; setUsers?: React.D
         setError('Enter a valid paid-through date in YYYY-MM-DD format.');
         return;
       }
+      if (candidate < new Date().toISOString().slice(0, 10)) {
+        setError('The paid-through date must be today or a future date.');
+        return;
+      }
       paidThrough = candidate;
     }
     void perform({
