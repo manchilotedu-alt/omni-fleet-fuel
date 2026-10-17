@@ -39,7 +39,7 @@ The backend validates the caller's Auth user, active server-bound Supabase sessi
 The `account-auth` `access-check` action now checks subscription status after validating session, device and account access:
 
 - A current trial is allowed only while `trial_ends_at` is in the future.
-- `paid` is allowed if `paid_through` is empty or has not passed.
+- `paid` is allowed only while `paid_through` is today or later; the Platform Owner UI and Edge Function require a valid paid-through date when marking an account paid.
 - `comped` accounts remain allowed.
 - `unpaid`, `overdue`, `expired`, expired trials and invalid trial records are denied by the app's server-checked access path.
 - Existing users without a subscription row remain usable for rollout compatibility. New Platform Owner-created users receive a subscription row.
