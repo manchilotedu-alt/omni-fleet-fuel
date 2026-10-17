@@ -81,3 +81,56 @@ drop trigger if exists platform_owner_audit_immutable on public.platform_owner_a
 create trigger platform_owner_audit_immutable
   before update or delete on public.platform_owner_audit_events
   for each row execute function private.prevent_platform_owner_audit_mutation();
+
+create or replace function private.is_account_device_access_allowed()
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_device_id uuid;
+  v_status text;
+  v_session text := auth.jwt() ->> 'session_id';
+  v_active_session text;
+  v_payment text;
+  v_trial_end timestamptz;
+  v_paid_through date;
+  v_has_subscription boolean := false;
+begin
+  if v_user_id is null or v_session is null then return false; end if;
+
+  select nullif(u.raw_app_meta_data ->> 'active_supabase_session_id', '')
+    into v_active_session from auth.users u where u.id = v_user_id;
+  if v_active_session is null or v_active_session <> v_session then return false; end if;
+
+  select c.status into v_status from public.account_access_controls c where c.user_id = v_user_id;
+  if coalesce(v_status, 'active') = 'blocked' then return false; end if;
+
+  select nullif(u.raw_app_meta_data ->> 'active_device_access_id', '')::uuid
+    into v_device_id from auth.users u where u.id = v_user_id;
+  if v_device_id is null then return false; end if;
+
+  select d.status into v_status from public.device_access_controls d where d.id = v_device_id;
+  if coalesce(v_status, 'pending') <> 'approved' then return false; end if;
+
+  select s.payment_status, s.trial_ends_at, s.paid_through
+    into v_payment, v_trial_end, v_paid_through
+    from public.platform_user_subscriptions s where s.user_id = v_user_id;
+  v_has_subscription := found;
+
+  if v_has_subscription then
+    if v_payment = 'comped' then return true; end if;
+    if v_payment = 'trial' then return v_trial_end is not null and v_trial_end > now(); end if;
+    if v_payment = 'paid' then return v_paid_through is null or v_paid_through >= current_date; end if;
+    return false;
+  end if;
+
+  return true;
+end;
+$$;
+
+revoke all on function private.is_account_device_access_allowed() from public, anon;
+grant execute on function private.is_account_device_access_allowed() to authenticated;
