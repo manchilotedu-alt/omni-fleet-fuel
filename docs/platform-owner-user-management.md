@@ -44,7 +44,7 @@ The `account-auth` `access-check` action now checks subscription status after va
 - `unpaid`, `overdue`, `expired`, expired trials and invalid trial records are denied by the app's server-checked access path.
 - Existing users without a subscription row remain usable for rollout compatibility. New Platform Owner-created users receive a subscription row.
 
-**Release blocker:** the current restrictive RLS helper in migration `20261017000200_enforce_account_device_access.sql` still checks session/account/device state but not subscription status. The Edge Function check alone is not a complete database-level enforcement boundary if a client calls Supabase tables directly. Extend and test the restrictive RLS helper for subscription state before describing payment expiry as fully enforced. This policy also requires the schema migration and matching Edge Functions to be deployed together. Until that approved rollout occurs, live payment enforcement is not active.
+The Platform Owner migration now replaces the restrictive RLS helper so subscription status is checked at the database policy boundary as well as in the app's `access-check` action. Existing users without a subscription row remain compatible with the current rollout; newly provisioned users have a row and must have a valid trial, paid-through date or complimentary status. This SQL change still needs migration validation in a non-production environment and must be deployed together with the matching Edge Functions. Until that approved rollout occurs, live payment enforcement is not active.
 
 ## Required first-time provisioning and release checks
 
