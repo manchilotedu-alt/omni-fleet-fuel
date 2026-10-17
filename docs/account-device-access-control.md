@@ -15,6 +15,10 @@ This feature is being developed on `feat/device-and-account-access-control`. The
 - Control tables are service-role-only; clients must not read or write them directly.
 - All existing sessions must be rechecked against server-side account and device status, not only at login.
 
+## First-device enrollment
+
+Devices first seen after the enforcement migration remain pending unless an already-approved administrator approves them. A brand-new self-signup has no approved administrator device yet, so its first device requires a trusted platform-operator approval/provisioning step; do not add a self-approval exception, because that would let a device-block bypass create a new account.
+
 ## Device identity limitation
 
 A sideloaded Android APK cannot reliably prove that two installations before and after a factory reset are the same physical phone using an app-generated UUID alone. Reinstall/reset may erase local identifiers. Unknown registrations must therefore remain pending by default. For a stronger same-physical-device guarantee across factory reset, the deployment needs supported Android Enterprise/MDM device ownership or an appropriate managed-device attestation strategy. Do not advertise a normal sideloaded APK as factory-reset-proof.
