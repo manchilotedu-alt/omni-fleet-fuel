@@ -166,7 +166,7 @@ Deno.serve(async (req: Request) => {
   if (action === "activate-session" || action === "access-check" || action === "admin-access-list" || action === "admin-access-set") {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const authorization = req.headers.get("Authorization") || "";
-    const accessToken = authorization.replace(/^Bearer\\s+/i, "").trim();
+    const accessToken = authorization.replace(/^Bearer\s+/i, "").trim();
     if (!anonKey || !accessToken) return reply(401, { error: "Please sign in to continue." });
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -210,6 +210,10 @@ Deno.serve(async (req: Request) => {
       if (membershipsError) return reply(500, { error: "Could not verify your organization access." });
 
       let shouldAutoApprove = false;
+      const { data: accessSettings } = await admin.from("account_device_access_settings")
+        .select("enforced_since").eq("id", true).maybeSingle();
+      const bootstrapCutoff = accessSettings?.enforced_since ? Date.parse(accessSettings.enforced_since) : Number.POSITIVE_INFINITY;
+      const callerCreatedAt = Date.parse(String(caller.created_at || ""));
       for (const membership of memberships || []) {
         const { error: linkError } = await admin.from("device_access_memberships").upsert({
           device_id: device.id,
@@ -219,7 +223,13 @@ Deno.serve(async (req: Request) => {
         }, { onConflict: "device_id,user_id,organization_id" });
         if (linkError) return reply(500, { error: "Could not link this device to your account." });
 
-        if (membership.role === "admin") {
+        if (membership.role === "admin" && callerCreatedAt < bootstrapCutoff) {
+          const { data: organization, error: organizationError } = await admin.from("organizations")
+            .select("created_at").eq("id", membership.organization_id).maybeSingle();
+          const organizationCreatedAt = Date.parse(String(organization?.created_at || ""));
+          if (organizationError || !Number.isFinite(organizationCreatedAt) || organizationCreatedAt >= bootstrapCutoff) {
+            continue;
+          }
           const { count, error: countError } = await admin
             .from("device_access_memberships")
             .select("device_id", { count: "exact", head: true })
@@ -276,11 +286,21 @@ Deno.serve(async (req: Request) => {
     if (callerControlError) return reply(500, { error: "Could not verify administrator account status." });
     if (callerControl?.status === "blocked") return reply(403, { error: callerControl.reason || "This account has been blocked by an administrator." });
     const callerDeviceId = String(caller.app_metadata?.active_device_access_id || "");
-    if (callerDeviceId) {
-      const { data: callerDevice, error: callerDeviceError } = await admin.from("device_access_controls")
-        .select("status").eq("id", callerDeviceId).maybeSingle();
-      if (callerDeviceError) return reply(500, { error: "Could not verify administrator device status." });
-      if (callerDevice?.status === "blocked") return reply(403, { error: "This device has been blocked by an administrator." });
+    const adminSessionId = String(body.sessionId || "");
+    const adminLocalDeviceId = String(body.deviceId || "");
+    if (!callerDeviceId || !adminSessionId || String(caller.app_metadata?.active_session_id || "") !== adminSessionId ||
+        !/^[0-9a-f-]{36}$/i.test(adminLocalDeviceId)) {
+      return reply(401, { error: "This administrator session is no longer active." });
+    }
+    const adminDeviceHash = await deviceHash(serviceKey, adminLocalDeviceId);
+    const { data: callerDevice, error: callerDeviceError } = await admin.from("device_access_controls")
+      .select("status").eq("id", callerDeviceId).eq("device_key_hash", adminDeviceHash).maybeSingle();
+    if (callerDeviceError) return reply(500, { error: "Could not verify administrator device status." });
+    if (!callerDevice) return reply(403, { error: "This device is not registered." });
+    if (callerDevice.status !== "approved") {
+      return reply(403, { error: callerDevice.status === "blocked"
+        ? "This device has been blocked by an administrator."
+        : "Only an approved device can manage access controls." });
     }
 
     if (action === "admin-access-list") {
