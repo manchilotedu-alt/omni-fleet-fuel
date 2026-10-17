@@ -1851,14 +1851,140 @@ function RecoveryRequestsPage({ onNotify }: { onNotify: (message: string) => voi
   </div>;
 }
 
-function UserManagement({ users, setUsers, onNotify }: { users: UserRecord[]; setUsers: React.Dispatch<React.SetStateAction<UserRecord[]>>; onNotify: (s: string) => void }) {
+function UserManagement({ onNotify }: { users?: UserRecord[]; setUsers?: React.Dispatch<React.SetStateAction<UserRecord[]>>; onNotify: (s: string) => void }) {
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('Viewer');
-  const [openId, setOpenId] = useState<number | null>(null);
-  const toggleStatus = (user: UserRecord) => { setUsers(prev => prev.map(item => item.id === user.id ? { ...item, status: item.status === 'Active' ? 'Blocked' : 'Active' } : item)); setOpenId(null); onNotify(user.status === 'Active' ? 'User blocked' : 'User activated'); };
-  const deleteUser = (user: UserRecord) => { if (!window.confirm(`Remove ${user.name}?`)) return; setUsers(prev => prev.filter(item => item.id !== user.id)); setOpenId(null); onNotify('User removed'); };
-  const editUser = (user: UserRecord) => { const nextName = window.prompt('Edit user name', user.name); if (nextName === null || !nextName.trim()) return; const nextRole = window.prompt('Edit role: Manager, Supervisor, Data Entry or Viewer', user.role); if (nextRole === null) return; const allowed = ['Manager','Supervisor','Data Entry','Viewer']; const normalized = allowed.includes(nextRole.trim()) ? nextRole.trim() : user.role; setUsers(prev => prev.map(item => item.id === user.id ? { ...item, name: nextName.trim(), role: normalized } : item)); setOpenId(null); onNotify('User updated'); };
-  return <div className="content"><div className="filterbar"><div><h2 className="plain-title">{translateStatic("System Users")}</h2><span className="muted">{translateStatic("Manager, Supervisor, Data Entry and Viewer access")}</span></div><button className="primary" onClick={() => { if (!name.trim()) return; setUsers(prev => [...prev, { id: Date.now(), name: name.trim(), role, status: 'Active' }]); setName(''); onNotify('User added'); }}><Plus size={17} /> {translateStatic("Add User")}</button></div><div className="form-grid"><Field label="New User Name" value={name} onChange={setName} placeholder="Employee name" /><SelectField label="Role" value={role} onChange={setRole} options={['Manager', 'Supervisor', 'Data Entry', 'Viewer']} /></div><div className="table-card"><table><thead><tr><th>#</th><th>{translateStatic("Name")}</th><th>{translateStatic("Role")}</th><th>{translateStatic("Status")}</th><th>{translateStatic("Action")}</th></tr></thead><tbody>{users.map((u, i) => <tr key={u.id}><td>{i + 1}</td><td><strong>{u.name}</strong></td><td>{u.role}</td><td><span className="active-dot">● {u.status}</span></td><td style={{ position: 'relative' }}><button type="button" className="icon-btn" aria-label={`Actions for ${u.name}`} onClick={() => setOpenId(openId === u.id ? null : u.id)}><MoreVertical size={16} /></button>{openId === u.id && <div className="user-action-menu"><button type="button" onClick={() => editUser(u)}><Edit3 size={14} /> {translateStatic("Edit")}</button><button type="button" onClick={() => toggleStatus(u)}>{u.status === 'Active' ? <EyeOff size={14} /> : <Eye size={14} />} {u.status === 'Active' ? 'Block' : 'Activate'}</button><button type="button" onClick={() => deleteUser(u)}><X size={14} /> {translateStatic("Remove")}</button></div>}</td></tr>)}</tbody></table></div></div>;
+  const [phone, setPhone] = useState('');
+  const [alternatePhone, setAlternatePhone] = useState('');
+  const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [trialDays, setTrialDays] = useState('30');
+
+  const loadAccounts = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get('/api/platform-admin/users');
+      setAccounts(response.data.users || []);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not load Platform Owner accounts.';
+      setError(message);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { void loadAccounts(); }, []);
+
+  const perform = async (payload: Record<string, unknown>, success: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.post('/api/platform-admin', payload);
+      onNotify(success);
+      await loadAccounts();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The request could not be completed.');
+    } finally { setBusy(false); }
+  };
+
+  const createAccount = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !phone.trim() || temporaryPassword.length < 12) {
+      setError('Enter the full name, main phone and a temporary password of at least 12 characters.');
+      return;
+    }
+    const days = Number(trialDays);
+    if (!Number.isInteger(days) || days < 0 || days > 3650) {
+      setError('Trial days must be a whole number from 0 to 3650.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await api.post('/api/platform-admin', {
+        action: 'create-user',
+        fullName: name.trim(),
+        phone: phone.trim(),
+        alternatePhone: alternatePhone.trim(),
+        temporaryPassword,
+        trialDays: days,
+      });
+      setName('');
+      setPhone('');
+      setAlternatePhone('');
+      setTemporaryPassword('');
+      setTrialDays('30');
+      onNotify('User account created. Share the temporary password securely; it cannot be retrieved from this screen.');
+      await loadAccounts();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The account could not be created.');
+    } finally { setBusy(false); }
+  };
+
+  const resetPassword = (account: any) => {
+    const password = window.prompt(`Enter a new temporary password for ${account.profile?.full_name || 'this user'} (12 characters minimum). Do not use a password they have used before.`);
+    if (password === null) return;
+    if (password.length < 12) { setError('The temporary password must contain at least 12 characters.'); return; }
+    void perform({ action: 'reset-user-password', userId: account.id, temporaryPassword: password }, 'Temporary password set. The user must change it after sign-in.');
+  };
+
+  const setPayment = (account: any, paymentStatus: string) => {
+    void perform({ action: 'set-subscription', userId: account.id, paymentStatus }, `Payment status changed to ${paymentStatus}.`);
+  };
+
+  const toggleAccount = (account: any) => {
+    const blocked = account.account_access?.status === 'blocked';
+    const reason = blocked ? '' : window.prompt('Reason for blocking this account (required):') || '';
+    if (!blocked && reason.trim().length < 3) return;
+    void perform({ action: 'set-account-access', userId: account.id, operation: blocked ? 'unblock' : 'block', reason }, blocked ? 'Account access restored.' : 'Account access blocked. Fleet data remains preserved.');
+  };
+
+  const extendTrial = (account: any) => {
+    const raw = window.prompt('Set a new trial duration in days from today (0 to end the trial now):', '30');
+    if (raw === null) return;
+    const days = Number(raw);
+    if (!Number.isInteger(days) || days < 0 || days > 3650) { setError('Trial duration must be a whole number from 0 to 3650.'); return; }
+    void perform({ action: 'set-subscription', userId: account.id, paymentStatus: 'trial', trialDays: days }, 'Trial period updated.');
+  };
+
+  return <div className="content">
+    <div className="filterbar"><div><h2 className="plain-title">Platform Owner — User Accounts</h2><span className="muted">Create accounts, manage trial/payment state, and control account access. Device access is managed separately.</span></div><button type="button" className="outline" disabled={loading || busy} onClick={() => void loadAccounts()}><History size={16} /> Refresh</button></div>
+    <form className="form-card" onSubmit={createAccount}>
+      <div className="form-title"><div><h2>Create User Account</h2><p>Only the Platform Owner can create accounts. Passwords are never stored in application tables.</p></div></div>
+      <div className="form-grid">
+        <label className="field"><span>Full name *</span><input value={name} onChange={e => setName(e.target.value)} autoComplete="name" maxLength={120} required /></label>
+        <label className="field"><span>Main phone *</span><input value={phone} onChange={e => setPhone(e.target.value)} type="tel" autoComplete="tel" placeholder="09XXXXXXXX or +2519XXXXXXXX" maxLength={24} required /></label>
+        <label className="field"><span>Alternate phone (optional)</span><input value={alternatePhone} onChange={e => setAlternatePhone(e.target.value)} type="tel" maxLength={24} placeholder="Optional second number" /></label>
+        <label className="field"><span>Temporary password *</span><input value={temporaryPassword} onChange={e => setTemporaryPassword(e.target.value)} type="password" autoComplete="new-password" minLength={12} maxLength={128} required /><small>At least 12 characters. Share it securely; it is not retrievable later.</small></label>
+        <label className="field"><span>Trial duration (days)</span><input value={trialDays} onChange={e => setTrialDays(e.target.value)} type="number" min={0} max={3650} step={1} required /></label>
+      </div>
+      <div className="form-actions"><button className="primary" type="submit" disabled={busy}><Plus size={16} /> {busy ? 'Working…' : 'Create Account'}</button></div>
+    </form>
+    {error && <div className="notice error" role="alert">{error}</div>}
+    <div className="table-card"><table><thead><tr><th>User</th><th>Main phone</th><th>Trial / payment</th><th>Account access</th><th>Actions</th></tr></thead>
+      <tbody>{accounts.map(account => {
+        const profile = account.profile || {};
+        const subscription = account.subscription || {};
+        const blocked = account.account_access?.status === 'blocked';
+        const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at).toLocaleDateString() : 'Not set';
+        return <tr key={account.id}>
+          <td><strong>{profile.full_name || 'Unnamed user'}</strong><div className="muted">{account.must_change_password ? 'Must change password' : 'Password status normal'}</div></td>
+          <td>{profile.phone || '—'}{profile.alternate_phone && <div className="muted">Alt: {profile.alternate_phone}</div>}</td>
+          <td><strong>{subscription.payment_status || 'unpaid'}</strong><div className="muted">Trial ends: {trialEnd}</div><div className="muted">Paid through: {subscription.paid_through || 'Not set'}</div></td>
+          <td><span className={blocked ? 'status-pill blocked' : 'status-pill active'}>{blocked ? 'Blocked' : 'Active'}</span>{blocked && subscription.access_note && <div className="muted">{subscription.access_note}</div>}</td>
+          <td><div className="user-row-actions">
+            <button type="button" className="outline" disabled={busy} onClick={() => toggleAccount(account)}>{blocked ? 'Restore' : 'Block account'}</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => setPayment(account, 'paid')}>Mark paid</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => setPayment(account, 'unpaid')}>Mark unpaid</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => extendTrial(account)}>Set trial</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => resetPassword(account)}>Reset password</button>
+          </div></td>
+        </tr>;
+      })}{!accounts.length && <tr><td colSpan={5}>{loading ? 'Loading accounts…' : 'No user accounts returned.'}</td></tr>}</tbody>
+    </table></div>
+    <p className="muted">Blocking an account does not delete its organization, vehicles, or fuel history. Payment status and device status are independent. Trial/payment restrictions still require server-side enforcement before they can block app usage.</p>
+  </div>;
 }
 
 function FormShell({ title, subtitle, children, onCancel, onSubmit, submitLabel = 'Save' }: { title: string; subtitle: string; children: React.ReactNode; onCancel: () => void; onSubmit: () => void; submitLabel?: string }) {
