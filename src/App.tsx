@@ -1751,7 +1751,7 @@ function AccessControlsPage({ onNotify }: { onNotify: (message: string) => void 
     } finally { setBusy(''); }
   };
 
-  const uniqueDevices = [...new Map(devices.map(device => [device.id, device])).values()];
+  const uniqueDevices = [...new Map<string, AccessDevice>(devices.map(device => [device.id, device] as [string, AccessDevice])).values()];
   return <div className="content">
     <div className="filterbar">
       <div><h2 className="plain-title">{t('Account and Device Access')}</h2><span className="muted">Account blocks apply on every phone. Device blocks apply to every account on that phone.</span></div>
