@@ -7,6 +7,7 @@ on:
     branches:
       - migration/appdeploy-source
       - feat/home-vehicle-search-monthly-summary
+      - feat/device-and-account-access-control
     paths:
       - 'src/**'
       - 'assets/**'
@@ -15,11 +16,13 @@ on:
       - 'vite.config.ts'
       - 'capacitor.config.ts'
       - 'index.html'
+      - 'supabase/**'
       - '.github/workflows/android-mobile.yml'
   pull_request:
     branches:
       - main
       - migration/appdeploy-source
+      - feat/home-vehicle-search-monthly-summary
     paths:
       - 'src/**'
       - 'assets/**'
@@ -28,6 +31,7 @@ on:
       - 'vite.config.ts'
       - 'capacitor.config.ts'
       - 'index.html'
+      - 'supabase/**'
       - '.github/workflows/android-mobile.yml'
 
 permissions:
@@ -39,6 +43,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check account-auth Edge Function
+        run: deno check supabase/functions/account-auth/index.ts
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
