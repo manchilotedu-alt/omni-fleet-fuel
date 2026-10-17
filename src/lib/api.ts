@@ -190,7 +190,9 @@ export const api = {
       const sessionId = crypto.randomUUID();
       await invokeAccountAuth({ action: 'activate-session', sessionId, deviceId: currentDeviceId(), deviceLabel: 'OMNI Fleet Fuel app' });
       localStorage.setItem('omni_ffm_active_session_id', sessionId);
-      return result({ user: userPayload(data.user) });
+      const refreshedSession = await supabase.auth.refreshSession();
+      throwSupabaseError(refreshedSession.error);
+      return result({ user: userPayload(refreshedSession.data.user || data.user) });
     }
 
     if (path === '/api/auth/login') {
@@ -206,7 +208,7 @@ export const api = {
       }
       if (!data.user) fail('Sign-in was not accepted. Check the phone number and password.', 401);
       const sessionId = crypto.randomUUID();
-      await invokeAccountAuth({ action: 'activate-session', sessionId });
+      await invokeAccountAuth({ action: 'activate-session', sessionId, deviceId: currentDeviceId(), deviceLabel: 'OMNI Fleet Fuel app' });
       localStorage.setItem('omni_ffm_active_session_id', sessionId);
       return result({ user: userPayload(data.user) });
     }
