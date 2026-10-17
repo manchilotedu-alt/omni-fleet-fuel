@@ -488,6 +488,9 @@ Deno.serve(async (req: Request) => {
     return (phoneCount.count ?? 0) >= 5 || (ipCount.count ?? 0) >= 12;
   }
   async function record(succeeded: boolean) {
+    // This table is exclusively for password-recovery throttling. Sign-in and signup
+    // attempts must never consume the recovery rate-limit budget.
+    if (action !== "recover") return;
     await admin.from("account_recovery_attempts").insert({ phone, ip_address: ipAddress, succeeded });
     await admin.from("account_recovery_attempts").delete().lt("attempted_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
   }
