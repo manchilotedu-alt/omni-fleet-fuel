@@ -130,6 +130,15 @@ begin
     return NEW;
   end if;
 
+  if nullif(btrim(v_reason), '') is null then
+    v_reason := case v_action
+      when 'block' then 'Blocked by administrator.'
+      when 'unblock' then 'Access restored by administrator.'
+      when 'approve' then 'Approved by administrator.'
+      else 'Access status changed by administrator.'
+    end;
+  end if;
+
   insert into public.access_control_audit_events
     (target_type, target_id, action, actor_user_id, reason)
   values (v_target_type, v_target_id, v_action, v_actor_id, v_reason);
