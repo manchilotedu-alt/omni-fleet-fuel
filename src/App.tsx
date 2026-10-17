@@ -2001,7 +2001,27 @@ function UserManagement({ onNotify }: { users?: UserRecord[]; setUsers?: React.D
   };
 
   const setPayment = (account: any, paymentStatus: string) => {
-    void perform({ action: 'set-subscription', userId: account.id, paymentStatus }, `Payment status changed to ${paymentStatus}.`);
+    let paidThrough: string | undefined;
+    if (paymentStatus === 'paid') {
+      const raw = window.prompt(
+        'Paid through date (YYYY-MM-DD; required):',
+        String(account.subscription?.paid_through || ''),
+      );
+      if (raw === null) return;
+      const candidate = raw.trim();
+      const parsed = /^\\d{4}-\\d{2}-\\d{2}$/.test(candidate) ? new Date(candidate + 'T00:00:00Z') : null;
+      if (!candidate || !parsed || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== candidate) {
+        setError('Enter a valid paid-through date in YYYY-MM-DD format.');
+        return;
+      }
+      paidThrough = candidate;
+    }
+    void perform({
+      action: 'set-subscription',
+      userId: account.id,
+      paymentStatus,
+      ...(paidThrough ? { paidThrough } : {}),
+    }, paymentStatus === 'paid' ? `Paid access recorded through ${paidThrough}.` : `Payment status changed to ${paymentStatus}.`);
   };
 
   const toggleAccount = (account: any) => {
@@ -2048,13 +2068,14 @@ function UserManagement({ onNotify }: { users?: UserRecord[]; setUsers?: React.D
             <button type="button" className="outline" disabled={busy} onClick={() => toggleAccount(account)}>{blocked ? 'Restore' : 'Block account'}</button>
             <button type="button" className="outline" disabled={busy} onClick={() => setPayment(account, 'paid')}>Mark paid</button>
             <button type="button" className="outline" disabled={busy} onClick={() => setPayment(account, 'unpaid')}>Mark unpaid</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => setPayment(account, 'comped')}>Complimentary</button>
             <button type="button" className="outline" disabled={busy} onClick={() => extendTrial(account)}>Set trial</button>
             <button type="button" className="outline" disabled={busy} onClick={() => resetPassword(account)}>Reset password</button>
           </div></td>
         </tr>;
       })}{!accounts.length && <tr><td colSpan={5}>{loading ? 'Loading accounts…' : 'No user accounts returned.'}</td></tr>}</tbody>
     </table></div>
-    <p className="muted">Blocking an account does not delete its organization, vehicles, or fuel history. Payment status and device status are independent. Trial/payment restrictions still require server-side enforcement before they can block app usage.</p>
+    <p className="muted">Blocking an account does not delete its organization, vehicles, or fuel history. Payment status and device status are independent. Paid access requires a paid-through date; complimentary access is managed separately.</p>
   </div>;
 }
 
