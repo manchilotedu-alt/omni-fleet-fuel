@@ -179,8 +179,18 @@ export const api = {
     }
 
     if (path === '/api/auth/logout') {
+      try {
+        await invokeAccountAuth({
+          action: 'deactivate-session',
+          sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+          deviceId: currentDeviceId(),
+        });
+      } catch {
+        // Continue local sign-out even if the server cannot be reached.
+      }
       const { error } = await supabase.auth.signOut();
       throwSupabaseError(error);
+      localStorage.removeItem('omni_ffm_active_session_id');
       return result({ ok: true });
     }
 
