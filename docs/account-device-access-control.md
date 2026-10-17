@@ -4,6 +4,10 @@
 
 This feature is being developed on `feat/device-and-account-access-control`. The migration is a schema-only scaffold; it has not been applied to the connected Supabase project, and no production Edge Function or app behavior has been changed.
 
+## Production migration-history warning
+
+The connected production Supabase project currently reports migration versions/names that do not match several checked-in migration filenames in this repository. The password-recovery tables are present in production, but the history names alone do not establish that every repository migration has been applied in the same order. **Do not run a production migration push or apply the older tenant-security migration blindly.** First reconcile the production migration baseline with the repository and review the exact SQL that would run. The tenant-security migration in this branch has been syntax-corrected for clean setups, but it drops and recreates foreign-key constraints; that deserves a planned, reviewed rollout rather than an unverified production push.
+
 ## Required enforcement
 
 - Account block is global to the auth user: deny sign-in and deny all app data operations from every phone.
