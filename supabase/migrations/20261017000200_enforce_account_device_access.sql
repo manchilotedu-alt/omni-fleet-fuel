@@ -12,8 +12,6 @@ declare
   v_device_id uuid;
   v_account_status text;
   v_device_status text;
-  v_current_session_id text;
-  v_token_session_id text;
 begin
   if v_user_id is null then
     return false;
@@ -28,20 +26,12 @@ begin
   end if;
 
   -- Read the current server-side app metadata rather than relying on a potentially stale JWT claim.
-  select
-    nullif(u.raw_app_meta_data ->> 'active_device_access_id', '')::uuid,
-    nullif(u.raw_app_meta_data ->> 'active_session_id', '')
-    into v_device_id, v_current_session_id
+  select nullif(u.raw_app_meta_data ->> 'active_device_access_id', '')::uuid
+    into v_device_id
   from auth.users u
   where u.id = v_user_id;
 
-  begin
-    v_token_session_id := current_setting('request.jwt.claims', true)::jsonb #>> '{app_metadata,active_session_id}';
-  exception when others then
-    return false;
-  end;
-
-  if v_device_id is null or v_current_session_id is null or v_token_session_id is distinct from v_current_session_id then
+  if v_device_id is null then
     return false;
   end if;
 
