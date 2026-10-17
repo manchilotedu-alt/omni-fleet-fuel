@@ -16,6 +16,17 @@ function throwSupabaseError(error: { message?: string; status?: number } | null)
 }
 
 
+
+function currentDeviceId(): string {
+  const key = "omni_ffm_device_id";
+  let id = localStorage.getItem(key) || "";
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
 async function currentUser() {
   const { data, error } = await supabase.auth.getUser();
   throwSupabaseError(error);
@@ -27,6 +38,11 @@ async function currentUser() {
     await supabase.auth.signOut();
     fail('This account was signed in on another device. Please sign in again.', 401);
   }
+  await invokeAccountAuth({
+    action: 'access-check',
+    sessionId: localSessionId,
+    deviceId: currentDeviceId(),
+  });
   return data.user;
 }
 
@@ -106,6 +122,11 @@ export const api = {
       return result({ requests: response?.requests || [] });
     }
 
+    if (path === '/api/admin/access-controls') {
+      const response = await invokeAccountAuth({ action: 'admin-access-list' });
+      return result({ accounts: response?.accounts || [], devices: response?.devices || [] });
+    }
+
     if (path === '/api/fleet-data') {
       const user = await currentUser();
       const organizationId = await currentOrganizationId(user.id);
@@ -129,6 +150,17 @@ export const api = {
         newPassword: String(body.newPassword || ''),
       });
       return result({ ok: true, message: response?.message || 'Password reset completed.' });
+    }
+
+    if (path === '/api/admin/access-controls') {
+      const response = await invokeAccountAuth({
+        action: 'admin-access-set',
+        kind: String(body.kind || ''),
+        targetId: String(body.targetId || ''),
+        operation: String(body.operation || ''),
+        reason: String(body.reason || ''),
+      });
+      return result({ ok: true, message: response?.message || 'Access status updated.' });
     }
 
     if (path === '/api/auth/logout') {
@@ -156,14 +188,14 @@ export const api = {
       throwSupabaseError(error);
       if (!data.user) fail('The account was created, but sign-in could not be completed. Please sign in manually.', 401);
       const sessionId = crypto.randomUUID();
-      await invokeAccountAuth({ action: 'activate-session', sessionId });
+      await invokeAccountAuth({ action: 'activate-session', sessionId, deviceId: currentDeviceId(), deviceLabel: 'OMNI Fleet Fuel app' });
       localStorage.setItem('omni_ffm_active_session_id', sessionId);
       return result({ user: userPayload(data.user) });
     }
 
     if (path === '/api/auth/login') {
       const phone = normalizePhone(body.phone);
-      await invokeAccountAuth({ action: 'prepare-login', phone });
+      await invokeAccountAuth({ action: 'prepare-login', phone, deviceId: currentDeviceId() });
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmailForPhone(phone),
         password: String(body.password || ''),
