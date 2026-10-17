@@ -29,6 +29,8 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldCheck,
+  Smartphone,
   UserCog,
   UserCircle,
   Wrench,
@@ -121,6 +123,15 @@ const translations: Record<string, string> = {
   'Photo must be 2 MB or smaller.': 'ፎቶው 2 MB ወይም ከዚያ በታች መሆን አለበት።',
   'User Management': 'የተጠቃሚዎች አስተዳደር',
   'Recovery Requests': 'የመለያ መመለሻ ጥያቄዎች',
+  'Access Controls': 'የመግቢያ ቁጥጥር',
+  'Account and Device Access': 'የአካውንትና ስልክ መግቢያ ቁጥጥር',
+  'Blocked': 'ታግዷል',
+  'Approved': 'ተፈቅዷል',
+  'Pending': 'በመጠባበቅ ላይ',
+  'Block account': 'አካውንት አግድ',
+  'Unblock account': 'አካውንት እገዳ አንሳ',
+  'Block device': 'ስልክ አግድ',
+  'Approve device': 'ስልክ ፍቀድ',
   'Pending recovery requests': 'በመጠባበቅ ላይ ያሉ የመለያ መመለሻ ጥያቄዎች',
   'Refresh': 'አድስ',
   'New password for this user': 'ለዚህ ተጠቃሚ አዲስ የይለፍ ቃል',
@@ -1143,6 +1154,7 @@ function AppContent() {
     Settings: <SettingsPage settings={settings} onSave={next => { setSettings(next); notify('Settings saved'); }} biometricEnabled={biometricEnabled} onToggleBiometric={toggleBiometric} />,
     'User Management': <UserManagement users={users} setUsers={setUsers} onNotify={notify} />,
     'Recovery Requests': <RecoveryRequestsPage onNotify={notify} />,
+    'Access Controls': <AccessControlsPage onNotify={notify} />,
     Profile: <ProfilePage user={authUser} photo={profilePhoto} onPhotoChange={setProfilePhoto} onNavigate={navigate} onNotify={notify} />,
   };
 
@@ -1171,6 +1183,7 @@ function AppContent() {
         <NavItem icon={<Settings />} label={t('Settings')} active={active === 'Settings'} onClick={() => navigate('Settings')} />
         <NavItem icon={<UserCog />} label={t('User Management')} active={active === 'User Management'} onClick={() => navigate('User Management')} />
         <NavItem icon={<KeyRound />} label={t('Recovery Requests')} active={active === 'Recovery Requests'} onClick={() => navigate('Recovery Requests')} />
+        <NavItem icon={<ShieldCheck />} label={t('Access Controls')} active={active === 'Access Controls'} onClick={() => navigate('Access Controls')} />
       </aside>
       <main className="main">
         <div className="page-head"><div><div className="crumb">{translateStatic("omni-Fleet")} <span>/</span> {t(active === 'Dashboard' ? 'Home' : active)}</div><h1>{t(active === 'Dashboard' ? 'Home' : active)}</h1></div><div className="head-actions">{active === 'Vehicle List' && <button className="primary" onClick={() => navigate('Add Vehicle')}><Plus size={17} /> Add Vehicle</button>}{active === 'Dashboard' && <button className="outline" onClick={() => navigate('Reports')}><FileText size={16} /> {t('View Report')}</button>}</div></div>
@@ -1698,6 +1711,71 @@ function SettingsPage({ settings, onSave, biometricEnabled, onToggleBiometric }:
   const [draft, setDraft] = useState<AppSettings>(settings);
   useEffect(() => setDraft(settings), [settings]);
   return <div className="content"><div className="settings-card"><h2>{t('Fuel Scheduling Rules')}</h2><p className="muted">{t('The system uses management-supplied data. Sundays are excluded by default and vehicle-specific off-days can be registered.')}</p><SelectField label="Default Currency" value={draft.currency} onChange={value => setDraft(prev => ({ ...prev, currency: value as AppSettings['currency'] }))} options={['ETB (Birr)', 'USD']} /><label className="check"><input type="checkbox" checked={draft.sundayOff} onChange={e => setDraft(prev => ({ ...prev, sundayOff: e.target.checked }))} /> {t('Sunday as Off-Day (default)')}</label><label className="check"><input type="checkbox" checked={draft.customOffDays} onChange={e => setDraft(prev => ({ ...prev, customOffDays: e.target.checked }))} /> {t('Enable custom off-days')}</label><label className="check"><input type="checkbox" checked={draft.requireManualApproval} onChange={e => setDraft(prev => ({ ...prev, requireManualApproval: e.target.checked }))} /> {t('Require approval for Manual Override')}</label><button type="button" className="primary" onClick={() => onSave(draft)}>{t('Save Settings')}</button><div className="settings-security"><h2>{t('Biometric Unlock')}</h2><p className="muted">{t('Use Face ID or Fingerprint to unlock this app on this device.')}</p><button type="button" className="primary" onClick={onToggleBiometric}>{t(biometricEnabled ? 'Disable biometric unlock' : 'Enable biometric unlock')}</button></div></div></div>;
+}
+
+
+type AccessAccount = { id: string; full_name?: string; phone?: string; role: string; status: 'active' | 'blocked'; reason?: string };
+type AccessDevice = { id: string; status: 'pending' | 'approved' | 'blocked'; device_label?: string; reason?: string; user_id: string; user_name?: string; last_seen_at?: string };
+
+function AccessControlsPage({ onNotify }: { onNotify: (message: string) => void }) {
+  const { t } = useLanguage();
+  const [accounts, setAccounts] = useState<AccessAccount[]>([]);
+  const [devices, setDevices] = useState<AccessDevice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    setLoading(true); setError('');
+    try {
+      const response = await api.get('/api/admin/access-controls');
+      setAccounts((response.data.accounts || []) as AccessAccount[]);
+      setDevices((response.data.devices || []) as AccessDevice[]);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Could not load access controls.');
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, []);
+
+  const change = async (kind: 'account' | 'device', targetId: string, operation: 'block' | 'unblock' | 'approve') => {
+    const label = kind === 'account' ? 'account' : 'device';
+    const reason = operation === 'block' ? window.prompt(`Reason for blocking this ${label} (optional):`) || '' : '';
+    if (operation === 'block' && !window.confirm(`Block this ${label}? Existing user and fleet data will not be deleted.`)) return;
+    setBusy(targetId); setError('');
+    try {
+      const response = await api.post('/api/admin/access-controls', { kind, targetId, operation, reason });
+      onNotify(response.data.message || 'Access status updated.');
+      await load();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Could not update access status.');
+    } finally { setBusy(''); }
+  };
+
+  const uniqueDevices = [...new Map(devices.map(device => [device.id, device])).values()];
+  return <div className="content">
+    <div className="filterbar">
+      <div><h2 className="plain-title">{t('Account and Device Access')}</h2><span className="muted">Account blocks apply on every phone. Device blocks apply to every account on that phone.</span></div>
+      <button type="button" className="outline" onClick={() => void load()} disabled={loading}>Refresh</button>
+    </div>
+    {error && <div className="error-banner"><AlertTriangle size={17} /> {error}</div>}
+    {loading ? <div className="empty-state">Loading access records…</div> : <>
+      <section className="panel">
+        <div className="section-title"><UserCog size={18} /><h2>Accounts</h2></div>
+        {accounts.length === 0 ? <p className="muted">No organization accounts found.</p> : accounts.map(account => <div className="list-row" key={account.id}>
+          <div className="list-main"><strong>{account.full_name || account.phone || account.id}</strong><small>{account.phone || ''} · {account.role}</small><small className={account.status === 'blocked' ? 'status-danger' : 'muted'}>{account.status === 'blocked' ? 'Blocked' : 'Active'}{account.reason ? ` · ${account.reason}` : ''}</small></div>
+          <button type="button" className={account.status === 'blocked' ? 'outline' : 'danger'} disabled={busy === account.id} onClick={() => void change('account', account.id, account.status === 'blocked' ? 'unblock' : 'block')}>{busy === account.id ? 'Please wait…' : account.status === 'blocked' ? 'Unblock' : 'Block account'}</button>
+        </div>)}
+      </section>
+      <section className="panel">
+        <div className="section-title"><Smartphone size={18} /><h2>Registered devices</h2></div>
+        {uniqueDevices.length === 0 ? <p className="muted">No devices have registered yet. Devices appear after a user signs in.</p> : uniqueDevices.map(device => <div className="list-row" key={device.id}>
+          <div className="list-main"><strong>{device.device_label || 'Registered device'}</strong><small>{device.user_name || 'Fleet user'}{device.last_seen_at ? ` · Last seen ${new Date(device.last_seen_at).toLocaleString()}` : ''}</small><small className={device.status === 'blocked' ? 'status-danger' : 'muted'}>{device.status}{device.reason ? ` · ${device.reason}` : ''}</small></div>
+          <button type="button" className={device.status === 'blocked' ? 'outline' : 'danger'} disabled={busy === device.id} onClick={() => void change('device', device.id, device.status === 'blocked' ? 'unblock' : device.status === 'pending' ? 'approve' : 'block')}>{busy === device.id ? 'Please wait…' : device.status === 'blocked' ? 'Unblock device' : device.status === 'pending' ? 'Approve device' : 'Block device'}</button>
+        </div>)}
+      </section>
+      <div className="settings-security"><ShieldCheck size={18} /><span>Blocking does not delete the account, memberships, vehicles, fuel history, or organization data.</span></div>
+    </>}
+  </div>;
 }
 
 type RecoveryRequest = {
