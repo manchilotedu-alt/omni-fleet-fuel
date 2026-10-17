@@ -64,3 +64,87 @@ comment on table public.device_access_controls is
   'Server-enforced global device status; pending devices are denied until an organization admin approves them.';
 comment on table public.device_access_memberships is
   'Links device registrations to users and organizations for scoped administrator review; does not own or delete fleet data.';
+  
+-- Immutable history of block/unblock/approval transitions. A trigger writes these rows
+-- in the same transaction as the status change so history cannot silently drift.
+create table if not exists public.access_control_audit_events (
+  id uuid primary key default gen_random_uuid(),
+  target_type text not null check (target_type in ('account', 'device')),
+  target_id uuid not null,
+  action text not null check (action in ('block', 'unblock', 'approve')),
+  actor_user_id uuid references auth.users(id) on delete set null,
+  reason text,
+  created_at timestamptz not null default now()
+);
+create index if not exists access_control_audit_events_target_idx
+  on public.access_control_audit_events (target_type, target_id, created_at desc);
+alter table public.access_control_audit_events enable row level security;
+revoke all on public.access_control_audit_events from anon, authenticated;
+
+create or replace function private.log_access_control_transition()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_old_status text;
+  v_new_status text := to_jsonb(NEW) ->> 'status';
+  v_target_type text;
+  v_target_id uuid;
+  v_action text;
+  v_actor_id uuid;
+  v_reason text := to_jsonb(NEW) ->> 'reason';
+begin
+  if TG_OP = 'UPDATE' then
+    v_old_status := to_jsonb(OLD) ->> 'status';
+  end if;
+
+  if TG_TABLE_NAME = 'account_access_controls' then
+    v_target_type := 'account';
+    v_target_id := (to_jsonb(NEW) ->> 'user_id')::uuid;
+    if v_new_status = 'blocked' and (TG_OP = 'INSERT' or v_old_status is distinct from 'blocked') then
+      v_action := 'block';
+    elsif v_new_status = 'active' and v_old_status = 'blocked' then
+      v_action := 'unblock';
+    else
+      return NEW;
+    end if;
+    v_actor_id := nullif(to_jsonb(NEW) ->> 'updated_by', '')::uuid;
+  elsif TG_TABLE_NAME = 'device_access_controls' then
+    v_target_type := 'device';
+    v_target_id := (to_jsonb(NEW) ->> 'id')::uuid;
+    if v_new_status = 'blocked' and (TG_OP = 'INSERT' or v_old_status is distinct from 'blocked') then
+      v_action := 'block';
+      v_actor_id := nullif(to_jsonb(NEW) ->> 'blocked_by', '')::uuid;
+    elsif v_new_status = 'approved' and v_old_status = 'pending' then
+      v_action := 'approve';
+      v_actor_id := nullif(to_jsonb(NEW) ->> 'approved_by', '')::uuid;
+    elsif v_new_status = 'approved' and v_old_status = 'blocked' then
+      v_action := 'unblock';
+      v_actor_id := nullif(to_jsonb(NEW) ->> 'approved_by', '')::uuid;
+    else
+      return NEW;
+    end if;
+  else
+    return NEW;
+  end if;
+
+  insert into public.access_control_audit_events
+    (target_type, target_id, action, actor_user_id, reason)
+  values (v_target_type, v_target_id, v_action, v_actor_id, v_reason);
+  return NEW;
+end;
+$;
+
+revoke all on function private.log_access_control_transition() from public, anon, authenticated;
+create trigger account_access_controls_audit
+  after insert or update on public.account_access_controls
+  for each row execute function private.log_access_control_transition();
+create trigger device_access_controls_audit
+  after insert or update on public.device_access_controls
+  for each row execute function private.log_access_control_transition();
+
+comment on table public.access_control_audit_events is
+  'Append-only server-side history of account/device block, unblock, and approval transitions.';
+
