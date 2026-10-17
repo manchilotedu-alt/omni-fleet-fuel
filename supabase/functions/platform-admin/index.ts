@@ -230,6 +230,9 @@ Deno.serve(async (req: Request) => {
           parsedPaidThrough.toISOString().slice(0, 10) !== paidThrough) {
         return reply(400, { error: "Enter a valid paid-through date." });
       }
+      if (paymentStatus === "paid" && paidThrough < new Date().toISOString().slice(0, 10)) {
+        return reply(400, { error: "The paid-through date must be today or a future date." });
+      }
     }
     const now = new Date();
     const update: Record<string, unknown> = { payment_status: paymentStatus, updated_by: caller.id, updated_at: now.toISOString() };
