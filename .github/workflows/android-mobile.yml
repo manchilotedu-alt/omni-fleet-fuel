@@ -49,6 +49,8 @@ jobs:
           deno-version: v2.x
       - name: Check account-auth Edge Function
         run: deno check --node-modules-dir=auto supabase/functions/account-auth/index.ts
+      - name: Check Platform Owner Edge Function
+        run: deno check --node-modules-dir=auto supabase/functions/platform-admin/index.ts
 
   build-android:
     runs-on: ubuntu-latest
