@@ -219,7 +219,18 @@ Deno.serve(async (req: Request) => {
       return reply(400, { error: "Trial extension must be a whole number from 0 to 3650." });
     }
     const paidThrough = body.paidThrough ? String(body.paidThrough) : null;
-    if (paidThrough && !/^\d{4}-\d{2}-\d{2}$/.test(paidThrough)) return reply(400, { error: "Enter a valid paid-through date." });
+    if (paymentStatus === "paid" && !paidThrough) {
+      return reply(400, { error: "A paid-through date is required when marking an account paid." });
+    }
+    if (paidThrough) {
+      const parsedPaidThrough = /^\d{4}-\d{2}-\d{2}$/.test(paidThrough)
+        ? new Date(paidThrough + "T00:00:00Z")
+        : null;
+      if (!parsedPaidThrough || !Number.isFinite(parsedPaidThrough.getTime()) ||
+          parsedPaidThrough.toISOString().slice(0, 10) !== paidThrough) {
+        return reply(400, { error: "Enter a valid paid-through date." });
+      }
+    }
     const now = new Date();
     const update: Record<string, unknown> = { payment_status: paymentStatus, updated_by: caller.id, updated_at: now.toISOString() };
     if (trialDays !== null) {
