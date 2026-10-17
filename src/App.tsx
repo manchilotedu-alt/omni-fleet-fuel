@@ -2009,7 +2009,7 @@ function UserManagement({ onNotify }: { users?: UserRecord[]; setUsers?: React.D
       );
       if (raw === null) return;
       const candidate = raw.trim();
-      const parsed = /^\\d{4}-\\d{2}-\\d{2}$/.test(candidate) ? new Date(candidate + 'T00:00:00Z') : null;
+      const parsed = /^\d{4}-\d{2}-\d{2}$/.test(candidate) ? new Date(candidate + 'T00:00:00Z') : null;
       if (!candidate || !parsed || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== candidate) {
         setError('Enter a valid paid-through date in YYYY-MM-DD format.');
         return;
