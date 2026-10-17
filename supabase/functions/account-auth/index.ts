@@ -99,11 +99,15 @@ Deno.serve(async (req: Request) => {
     if (recoveryAccountControl?.status === "blocked") return reply(403, { error: recoveryAccountControl.reason || "This account has been blocked by an administrator." });
     const recoveryDeviceId = String(recoveryCaller.app_metadata?.active_device_access_id || "");
     const recoverySessionId = String(body.sessionId || "");
-    if (!recoveryDeviceId || !recoverySessionId || String(recoveryCaller.app_metadata?.active_session_id || "") !== recoverySessionId) {
+    const recoveryLocalDeviceId = String(body.deviceId || "");
+    if (!recoveryDeviceId || !recoverySessionId ||
+        String(recoveryCaller.app_metadata?.active_session_id || "") !== recoverySessionId ||
+        !/^[0-9a-f-]{36}$/i.test(recoveryLocalDeviceId)) {
       return reply(401, { error: "This administrator session is no longer active." });
     }
+    const recoveryDeviceKeyHash = await deviceHash(serviceKey, recoveryLocalDeviceId);
     const { data: recoveryDevice, error: recoveryDeviceError } = await admin.from("device_access_controls")
-      .select("status").eq("id", recoveryDeviceId).maybeSingle();
+      .select("status").eq("id", recoveryDeviceId).eq("device_key_hash", recoveryDeviceKeyHash).maybeSingle();
     if (recoveryDeviceError) return reply(500, { error: "Could not verify administrator device status." });
     if (recoveryDevice?.status !== "approved") return reply(403, { error: "Only an approved device can manage recovery requests." });
     const { data: adminMembership, error: membershipError } = await admin
@@ -243,6 +247,10 @@ Deno.serve(async (req: Request) => {
         }).eq("id", device.id);
         if (approveError) return reply(500, { error: "Could not approve the initial administrator device." });
         device.status = "approved";
+      }
+
+      if (device.status !== "approved") {
+        return reply(200, { ok: true, deviceStatus: "pending", deviceId: device.id });
       }
 
       const appMetadata = {
