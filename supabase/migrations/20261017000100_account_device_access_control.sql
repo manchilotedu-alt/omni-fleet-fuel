@@ -10,6 +10,13 @@ create table if not exists public.account_access_controls (
   blocked_at timestamptz
 );
 
+create table if not exists public.account_device_access_settings (
+  id boolean primary key default true check (id),
+  enforced_since timestamptz not null default now()
+);
+insert into public.account_device_access_settings (id) values (true)
+on conflict (id) do nothing;
+
 create table if not exists public.device_access_controls (
   id uuid primary key default gen_random_uuid(),
   device_key_hash text not null unique,
@@ -40,12 +47,14 @@ create index if not exists device_access_memberships_user_idx
   on public.device_access_memberships (user_id, last_seen_at desc);
 
 alter table public.account_access_controls enable row level security;
+alter table public.account_device_access_settings enable row level security;
 alter table public.device_access_controls enable row level security;
 alter table public.device_access_memberships enable row level security;
 
 -- Access is intentionally mediated by the account-auth Edge Function using its server-only service role.
 -- Do not expose these control tables to client-side reads or writes.
 revoke all on public.account_access_controls from anon, authenticated;
+revoke all on public.account_device_access_settings from anon, authenticated;
 revoke all on public.device_access_controls from anon, authenticated;
 revoke all on public.device_access_memberships from anon, authenticated;
 
