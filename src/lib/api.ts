@@ -104,6 +104,24 @@ async function invokeAccountAuth(body: Record<string, unknown>): Promise<any> {
   return data;
 }
 
+async function invokePlatformAdmin(body: Record<string, unknown>): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('platform-admin', { body });
+  if (error) {
+    const context = (error as any).context;
+    if (context && typeof context.clone === 'function') {
+      try {
+        const payload = await context.clone().json();
+        fail(payload?.error || error.message || 'Platform Owner request failed.', context.status || 400);
+      } catch (parseError) {
+        if ((parseError as any)?.response) throw parseError;
+      }
+    }
+    fail(error.message || 'Platform Owner request failed.', 400);
+  }
+  if (data?.error) fail(String(data.error), 400);
+  return data;
+}
+
 const emptyState = {
   vehicles: [] as unknown[],
   fuel: [] as unknown[],
@@ -114,6 +132,11 @@ const emptyState = {
 
 export const api = {
   async get(path: string): Promise<ApiResponse<any>> {
+    if (path === '/api/platform-admin/users') {
+      const response = await invokePlatformAdmin({ action: 'list-users', page: 1, perPage: 100 });
+      return result({ users: response?.users || [], page: response?.page || 1, total: response?.total ?? null });
+    }
+
     if (path === '/api/auth/me') {
       const user = await currentUser();
       const { data: profile } = await supabase.from('profiles').select('full_name,phone').eq('id', user.id).maybeSingle();
@@ -154,6 +177,11 @@ export const api = {
   },
 
   async post(path: string, body: any = {}): Promise<ApiResponse<any>> {
+    if (path === '/api/platform-admin') {
+      const response = await invokePlatformAdmin(body);
+      return result(response || { ok: true });
+    }
+
     if (path === '/api/admin/recovery-requests/resolve') {
       const response = await invokeAccountAuth({
         action: 'admin-recovery-resolve',
