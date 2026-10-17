@@ -23,6 +23,35 @@ Devices first seen after the enforcement migration remain pending unless an alre
 
 The enforcement migration deliberately denies database access to sessions that have not been registered to an approved device and bound to the current Supabase session. Do not apply it separately from the matching Edge Function and client release. Older sideloaded APKs may not send the new device/session fields and may lose access until updated. Build and test the replacement APK, prepare first-device approvals, and rehearse the rollout in a non-production environment before applying either migration to production.
 
+## Trusted first-device provisioning (operator-only)
+
+New signups intentionally cannot self-approve their first device. For a verified first-time organization owner, a trusted operator can inspect pending registrations in the Supabase SQL editor (never expose service-role credentials in the app):
+
+```sql
+select d.id, d.status, d.device_label, d.first_seen_at,
+       m.user_id, p.full_name, p.phone, m.organization_id
+from public.device_access_controls d
+join public.device_access_memberships m on m.device_id = d.id
+left join public.profiles p on p.id = m.user_id
+where d.status = 'pending'
+order by d.first_seen_at desc;
+```
+
+Verify the person and organization out-of-band before approving the exact device ID. Replace both UUID placeholders with the verified operator's auth user ID and the pending device ID:
+
+```sql
+update public.device_access_controls
+set status = 'approved',
+    approved_by = 'OPERATOR_AUTH_USER_UUID',
+    reason = 'First device verified by support',
+    updated_at = now(),
+    blocked_at = null
+where id = 'VERIFIED_PENDING_DEVICE_UUID'
+  and status = 'pending';
+```
+
+The operator should confirm exactly one row was updated. The user then signs in again so the Edge Function binds the approved device to the new Supabase session. Never approve a device solely because the requester says their previous phone was blocked.
+
 ## Device identity limitation
 
 A sideloaded Android APK cannot reliably prove that two installations before and after a factory reset are the same physical phone using an app-generated UUID alone. Reinstall/reset may erase local identifiers. Unknown registrations must therefore remain pending by default. For a stronger same-physical-device guarantee across factory reset, the deployment needs supported Android Enterprise/MDM device ownership or an appropriate managed-device attestation strategy. Do not advertise a normal sideloaded APK as factory-reset-proof.
