@@ -148,3 +148,18 @@ create trigger device_access_controls_audit
 comment on table public.access_control_audit_events is
   'Append-only server-side history of account/device block, unblock, and approval transitions.';
 
+create or replace function private.prevent_access_control_audit_mutation()
+returns trigger
+language plpgsql
+set search_path = ''
+as $
+begin
+  raise exception 'Access-control audit events are immutable.';
+end;
+$;
+revoke all on function private.prevent_access_control_audit_mutation() from public, anon, authenticated;
+create trigger access_control_audit_immutable
+  before update or delete on public.access_control_audit_events
+  for each row execute function private.prevent_access_control_audit_mutation();
+
+
