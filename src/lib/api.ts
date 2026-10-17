@@ -69,6 +69,7 @@ function userPayload(user: any) {
     email: isInternalLoginEmail ? '' : email,
     phone: user.phone || user.user_metadata?.phone || '',
     name: user.user_metadata?.full_name || user.user_metadata?.name || user.phone || email || 'Fleet Manager',
+    mustChangePassword: user.app_metadata?.must_change_password === true,
   };
 }
 
@@ -182,6 +183,17 @@ export const api = {
   },
 
   async post(path: string, body: any = {}): Promise<ApiResponse<any>> {
+    if (path === '/api/auth/change-password') {
+      const response = await invokeAccountAuth({
+        action: 'change-password',
+        sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+        deviceId: currentDeviceId(),
+        currentPassword: String(body.currentPassword || ''),
+        newPassword: String(body.newPassword || ''),
+      });
+      return result(response || { ok: true });
+    }
+
     if (path === '/api/platform-admin') {
       const response = await invokePlatformAdmin(body);
       return result(response || { ok: true });
