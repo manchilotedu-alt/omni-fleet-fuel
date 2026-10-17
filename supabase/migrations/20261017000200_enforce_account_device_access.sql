@@ -77,4 +77,4 @@ end
 $$;
 
 comment on function private.is_account_device_access_allowed() is
-  'Restrictive RLS gate: blocks account-wide status and requires an approved device registration in the JWT app_metadata.';
+  'Restrictive RLS gate: blocks blocked accounts and requires an approved device registration from current server-side auth metadata.';
