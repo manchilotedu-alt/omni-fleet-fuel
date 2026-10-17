@@ -50,6 +50,19 @@ function constantTimeEqual(a: string, b: string): boolean {
   return mismatch === 0;
 }
 
+
+async function deviceHash(secret: string, deviceId: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("omni-device|" + deviceId)));
+  return Array.from(signature, b => b.toString(16).padStart(2, "0")).join("");
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return reply(405, { error: "Method not allowed." });
@@ -133,6 +146,177 @@ Deno.serve(async (req: Request) => {
     }).eq("id", requestId).eq("status", "pending");
     if (updateError) return reply(500, { error: "The password was reset, but the request status could not be updated. Please contact support." });
     return reply(200, { ok: true, message: "Password reset completed. Tell the user to sign in with the new password." });
+  }
+
+
+  if (action === "activate-session" || action === "access-check" || action === "admin-access-list" || action === "admin-access-set") {
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const authorization = req.headers.get("Authorization") || "";
+    const accessToken = authorization.replace(/^Bearer\\s+/i, "").trim();
+    if (!anonKey || !accessToken) return reply(401, { error: "Please sign in to continue." });
+    const callerClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: callerData, error: callerError } = await callerClient.auth.getUser(accessToken);
+    if (callerError || !callerData.user) return reply(401, { error: "Your session is invalid. Please sign in again." });
+    const caller = callerData.user;
+
+    if (action === "activate-session") {
+      const sessionId = String(body.sessionId || "");
+      const deviceId = String(body.deviceId || "");
+      if (!/^[0-9a-f-]{36}$/i.test(sessionId) || !/^[0-9a-f-]{36}$/i.test(deviceId)) {
+        return reply(400, { error: "A valid session and device identifier are required." });
+      }
+      const hash = await deviceHash(serviceKey, deviceId);
+      let { data: device, error: deviceError } = await admin
+        .from("device_access_controls")
+        .select("id,status")
+        .eq("device_key_hash", hash)
+        .maybeSingle();
+      if (deviceError) return reply(500, { error: "Could not verify this device." });
+      if (device?.status === "blocked") return reply(403, { error: "This device has been blocked by an administrator." });
+
+      if (!device) {
+        const { data: created, error: createError } = await admin
+          .from("device_access_controls")
+          .insert({ device_key_hash: hash, status: "pending", device_label: String(body.deviceLabel || "Android / Web device").slice(0, 100) })
+          .select("id,status")
+          .single();
+        if (createError || !created) return reply(500, { error: "Could not register this device." });
+        device = created;
+      } else {
+        await admin.from("device_access_controls").update({ last_seen_at: new Date().toISOString() }).eq("id", device.id);
+      }
+
+      const { data: memberships, error: membershipsError } = await admin
+        .from("organization_members")
+        .select("organization_id,role")
+        .eq("user_id", caller.id);
+      if (membershipsError) return reply(500, { error: "Could not verify your organization access." });
+
+      let shouldAutoApprove = false;
+      for (const membership of memberships || []) {
+        const { error: linkError } = await admin.from("device_access_memberships").upsert({
+          device_id: device.id,
+          user_id: caller.id,
+          organization_id: membership.organization_id,
+          last_seen_at: new Date().toISOString(),
+        }, { onConflict: "device_id,user_id,organization_id" });
+        if (linkError) return reply(500, { error: "Could not link this device to your account." });
+
+        if (membership.role === "admin") {
+          const { count, error: countError } = await admin
+            .from("device_access_memberships")
+            .select("device_id", { count: "exact", head: true })
+            .eq("organization_id", membership.organization_id);
+          if (!countError && (count || 0) <= 1) shouldAutoApprove = true;
+        }
+      }
+      if (device.status === "pending" && shouldAutoApprove) {
+        const { error: approveError } = await admin.from("device_access_controls").update({
+          status: "approved", approved_by: caller.id, updated_at: new Date().toISOString(),
+        }).eq("id", device.id);
+        if (approveError) return reply(500, { error: "Could not approve the initial administrator device." });
+        device.status = "approved";
+      }
+
+      const appMetadata = {
+        ...(caller.app_metadata || {}),
+        active_session_id: sessionId,
+        active_device_access_id: device.id,
+      };
+      const { error: updateError } = await admin.auth.admin.updateUserById(caller.id, { app_metadata: appMetadata });
+      if (updateError) return reply(500, { error: "Could not activate the secure session." });
+      return reply(200, { ok: true, deviceStatus: device.status, deviceId: device.id });
+    }
+
+    if (action === "access-check") {
+      const deviceId = String(caller.app_metadata?.active_device_access_id || "");
+      const sessionId = String(body.sessionId || "");
+      const localDeviceId = String(body.deviceId || "");
+      if (!deviceId || !sessionId || !localDeviceId) return reply(403, { error: "This session is not registered to an approved device." });
+      if (String(caller.app_metadata?.active_session_id || "") !== sessionId) return reply(401, { error: "This account was signed in on another device. Please sign in again." });
+      const hash = await deviceHash(serviceKey, localDeviceId);
+      const { data: device, error: deviceError } = await admin.from("device_access_controls")
+        .select("id,status").eq("id", deviceId).eq("device_key_hash", hash).maybeSingle();
+      if (deviceError) return reply(500, { error: "Could not verify device access." });
+      if (!device || device.status !== "approved") return reply(403, { error: device?.status === "blocked" ? "This device has been blocked by an administrator." : "This device is waiting for administrator approval." });
+      const { data: accountControl, error: accountError } = await admin.from("account_access_controls")
+        .select("status,reason").eq("user_id", caller.id).maybeSingle();
+      if (accountError) return reply(500, { error: "Could not verify account access." });
+      if (accountControl?.status === "blocked") return reply(403, { error: accountControl.reason || "This account has been blocked by an administrator." });
+      return reply(200, { ok: true });
+    }
+
+    const { data: adminMembership, error: adminMembershipError } = await admin
+      .from("organization_members").select("organization_id")
+      .eq("user_id", caller.id).eq("role", "admin").limit(1).maybeSingle();
+    if (adminMembershipError || !adminMembership?.organization_id) return reply(403, { error: "Only an organization administrator can manage access controls." });
+    const organizationId = adminMembership.organization_id;
+
+    if (action === "admin-access-list") {
+      const { data: members, error: membersError } = await admin.from("organization_members")
+        .select("user_id,role").eq("organization_id", organizationId);
+      if (membersError) return reply(500, { error: "Could not load organization members." });
+      const memberIds = (members || []).map((m: { user_id: string }) => m.user_id);
+      const { data: profiles } = memberIds.length
+        ? await admin.from("profiles").select("id,full_name,phone").in("id", memberIds)
+        : { data: [] as { id: string; full_name: string; phone: string }[] };
+      const { data: accounts, error: accountsError } = memberIds.length
+        ? await admin.from("account_access_controls").select("user_id,status,reason,updated_at,blocked_at").in("user_id", memberIds)
+        : { data: [] as Record<string, unknown>[], error: null };
+      if (accountsError) return reply(500, { error: "Could not load account access status." });
+      const { data: links, error: linksError } = await admin.from("device_access_memberships")
+        .select("device_id,user_id,first_seen_at,last_seen_at").eq("organization_id", organizationId)
+        .order("last_seen_at", { ascending: false }).limit(500);
+      if (linksError) return reply(500, { error: "Could not load registered devices." });
+      const deviceIds = [...new Set((links || []).map((x: { device_id: string }) => x.device_id))];
+      const { data: devices, error: devicesError } = deviceIds.length
+        ? await admin.from("device_access_controls").select("id,status,device_label,reason,first_seen_at,last_seen_at,blocked_at").in("id", deviceIds)
+        : { data: [] as Record<string, unknown>[], error: null };
+      if (devicesError) return reply(500, { error: "Could not load device status." });
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      const accountMap = new Map((accounts || []).map((a: any) => [a.user_id, a]));
+      const deviceMap = new Map((devices || []).map((d: any) => [d.id, d]));
+      return reply(200, {
+        accounts: (members || []).map((m: any) => ({ ...profileMap.get(m.user_id), role: m.role, status: accountMap.get(m.user_id)?.status || "active", reason: accountMap.get(m.user_id)?.reason || "", blocked_at: accountMap.get(m.user_id)?.blocked_at || null })),
+        devices: (links || []).map((link: any) => ({ ...deviceMap.get(link.device_id), user_id: link.user_id, user_name: profileMap.get(link.user_id)?.full_name || "Fleet user", first_seen_at: link.first_seen_at, last_seen_at: link.last_seen_at })),
+      });
+    }
+
+    const kind = String(body.kind || "");
+    const targetId = String(body.targetId || "");
+    const operation = String(body.operation || "");
+    const reason = String(body.reason || "").trim().slice(0, 500);
+    if (!["account", "device"].includes(kind) || !targetId || !["block", "unblock", "approve"].includes(operation)) {
+      return reply(400, { error: "Choose a valid account/device access action." });
+    }
+    if (kind === "account") {
+      const { data: member, error: memberError } = await admin.from("organization_members")
+        .select("user_id").eq("organization_id", organizationId).eq("user_id", targetId).maybeSingle();
+      if (memberError || !member) return reply(403, { error: "This account is outside your organization." });
+      if (targetId === caller.id && operation === "block") return reply(400, { error: "You cannot block your own administrator account." });
+      const status = operation === "block" ? "blocked" : "active";
+      const { error } = await admin.from("account_access_controls").upsert({
+        user_id: targetId, status, reason: status === "blocked" ? (reason || "Blocked by organization administrator.") : null,
+        updated_by: caller.id, updated_at: new Date().toISOString(), blocked_at: status === "blocked" ? new Date().toISOString() : null,
+      }, { onConflict: "user_id" });
+      if (error) return reply(500, { error: "Could not update account access." });
+      return reply(200, { ok: true, message: status === "blocked" ? "Account blocked on all devices." : "Account access restored." });
+    }
+
+    const { data: deviceLink, error: deviceLinkError } = await admin.from("device_access_memberships")
+      .select("device_id").eq("organization_id", organizationId).eq("device_id", targetId).limit(1).maybeSingle();
+    if (deviceLinkError || !deviceLink) return reply(403, { error: "This device is outside your organization." });
+    const status = operation === "block" ? "blocked" : "approved";
+    const { error } = await admin.from("device_access_controls").update({
+      status, reason: status === "blocked" ? (reason || "Blocked by organization administrator.") : null,
+      blocked_by: status === "blocked" ? caller.id : null, approved_by: status === "approved" ? caller.id : null,
+      updated_at: new Date().toISOString(), blocked_at: status === "blocked" ? new Date().toISOString() : null,
+    }).eq("id", targetId);
+    if (error) return reply(500, { error: "Could not update device access." });
+    return reply(200, { ok: true, message: status === "blocked" ? "Device blocked for every account." : "Device approved." });
   }
 
   let phone = "";
