@@ -179,7 +179,7 @@ Deno.serve(async (req: Request) => {
   }
 
 
-  if (action === "activate-session" || action === "access-check" || action === "admin-access-list" || action === "admin-access-set") {
+  if (action === "activate-session" || action === "deactivate-session" || action === "access-check" || action === "admin-access-list" || action === "admin-access-set") {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const authorization = req.headers.get("Authorization") || "";
     const accessToken = authorization.replace(/^Bearer\s+/i, "").trim();
@@ -191,6 +191,32 @@ Deno.serve(async (req: Request) => {
     const { data: callerData, error: callerError } = await callerClient.auth.getUser(accessToken);
     if (callerError || !callerData.user) return reply(401, { error: "Your session is invalid. Please sign in again." });
     const caller = callerData.user;
+
+    if (action === "deactivate-session") {
+      const sessionId = String(body.sessionId || "");
+      const deviceId = String(body.deviceId || "");
+      const currentAppSessionId = String(caller.app_metadata?.active_session_id || "");
+      const currentSupabaseSessionId = String(caller.app_metadata?.active_supabase_session_id || "");
+      const requestSupabaseSessionId = supabaseSessionId(accessToken);
+      if (currentAppSessionId !== sessionId || !sessionId ||
+          currentSupabaseSessionId !== requestSupabaseSessionId || !requestSupabaseSessionId) {
+        return reply(200, { ok: true, alreadyInactive: true });
+      }
+      if (!/^[0-9a-f-]{36}$/i.test(deviceId)) return reply(400, { error: "A valid device identifier is required." });
+      const activeDeviceId = String(caller.app_metadata?.active_device_access_id || "");
+      const hash = await deviceHash(serviceKey, deviceId);
+      const { data: device, error: deviceError } = await admin.from("device_access_controls")
+        .select("id").eq("id", activeDeviceId).eq("device_key_hash", hash).maybeSingle();
+      if (deviceError) return reply(500, { error: "Could not verify this device." });
+      if (!device) return reply(403, { error: "This session does not match this device." });
+      const appMetadata = { ...(caller.app_metadata || {}) };
+      delete appMetadata.active_session_id;
+      delete appMetadata.active_supabase_session_id;
+      delete appMetadata.active_device_access_id;
+      const { error: updateError } = await admin.auth.admin.updateUserById(caller.id, { app_metadata: appMetadata });
+      if (updateError) return reply(500, { error: "Could not deactivate the secure session." });
+      return reply(200, { ok: true });
+    }
 
     if (action === "activate-session") {
       const sessionId = String(body.sessionId || "");
