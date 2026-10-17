@@ -189,7 +189,7 @@ Deno.serve(async (req: Request) => {
   }
 
 
-  if (action === "activate-session" || action === "deactivate-session" || action === "access-check" || action === "admin-access-list" || action === "admin-access-set") {
+  if (action === "activate-session" || action === "deactivate-session" || action === "access-check" || action === "admin-access-list" || action === "admin-access-set" || action === "change-password") {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const authorization = req.headers.get("Authorization") || "";
     const accessToken = authorization.replace(/^Bearer\s+/i, "").trim();
@@ -201,6 +201,48 @@ Deno.serve(async (req: Request) => {
     const { data: callerData, error: callerError } = await callerClient.auth.getUser(accessToken);
     if (callerError || !callerData.user) return reply(401, { error: "Your session is invalid. Please sign in again." });
     const caller = callerData.user;
+
+    if (action === "change-password") {
+      const currentPassword = String(body.currentPassword || "");
+      const newPassword = String(body.newPassword || "");
+      const sessionId = String(body.sessionId || "");
+      const deviceId = String(body.deviceId || "");
+      const jwtSessionId = supabaseSessionId(accessToken);
+      if (!jwtSessionId || jwtSessionId !== String(caller.app_metadata?.active_supabase_session_id || "") ||
+          !sessionId || sessionId !== String(caller.app_metadata?.active_session_id || "")) {
+        return reply(401, { error: "Your secure session is no longer active. Sign in again." });
+      }
+      if (!/^[0-9a-f-]{36}$/i.test(deviceId)) return reply(400, { error: "A valid device identifier is required." });
+      if (newPassword.length < 12 || newPassword.length > 128) return reply(400, { error: "The new password must contain 12–128 characters." });
+      if (currentPassword.length < 8 || currentPassword === newPassword) return reply(400, { error: "Enter your current password and choose a different new password." });
+
+      const accountControl = await admin.from("account_access_controls").select("status,reason").eq("user_id", caller.id).maybeSingle();
+      if (accountControl.error) return reply(500, { error: "Could not verify account access." });
+      if (accountControl.data?.status === "blocked") return reply(403, { error: accountControl.data.reason || "This account has been blocked." });
+
+      const activeDeviceId = String(caller.app_metadata?.active_device_access_id || "");
+      const hash = await deviceHash(serviceKey, deviceId);
+      const deviceResult = await admin.from("device_access_controls").select("id,status")
+        .eq("id", activeDeviceId).eq("device_key_hash", hash).maybeSingle();
+      if (deviceResult.error) return reply(500, { error: "Could not verify this device." });
+      if (deviceResult.data?.status !== "approved") return reply(403, { error: "This device is not approved." });
+
+      const loginEmail = String(caller.email || "");
+      if (!loginEmail || !loginEmail.endsWith("@users.omni-fleet-fuel.invalid")) {
+        return reply(400, { error: "This account needs support assistance to change its password." });
+      }
+      const verifyClient = createClient(supabaseUrl, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
+      const { error: verifyError } = await verifyClient.auth.signInWithPassword({ email: loginEmail, password: currentPassword });
+      if (verifyError) return reply(401, { error: "Current password is incorrect." });
+
+      const appMetadata = { ...(caller.app_metadata || {}), must_change_password: false };
+      const { error: passwordError } = await admin.auth.admin.updateUserById(caller.id, {
+        password: newPassword,
+        app_metadata: appMetadata,
+      });
+      if (passwordError) return reply(400, { error: "The new password could not be saved." });
+      return reply(200, { ok: true, mustChangePassword: false, message: "Password changed. Sign in again with your new password." });
+    }
 
     if (action === "deactivate-session") {
       const sessionId = String(body.sessionId || "");
