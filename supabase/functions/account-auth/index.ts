@@ -322,6 +322,26 @@ Deno.serve(async (req: Request) => {
   let phone = "";
   try { phone = normalizePhone(body.phone); } catch { return reply(400, { error: "Enter a valid phone number with country code, or an Ethiopian 09/9 number." }); }
 
+
+  if (action === "prepare-login" || action === "signup") {
+    const deviceId = String(body.deviceId || "");
+    if (!/^[0-9a-f-]{36}$/i.test(deviceId)) return reply(400, { error: "This app could not identify the device. Please update the app and try again." });
+    const hash = await deviceHash(serviceKey, deviceId);
+    const { data: knownDevice, error: knownDeviceError } = await admin.from("device_access_controls")
+      .select("status").eq("device_key_hash", hash).maybeSingle();
+    if (knownDeviceError) return reply(500, { error: "Could not verify device access." });
+    if (knownDevice?.status === "blocked") return reply(403, { error: "This device has been blocked by an administrator." });
+    if (action === "prepare-login") {
+      const { data: profile } = await admin.from("profiles").select("id").eq("phone", phone).maybeSingle();
+      if (profile?.id) {
+        const { data: accountControl, error: accountControlError } = await admin.from("account_access_controls")
+          .select("status,reason").eq("user_id", profile.id).maybeSingle();
+        if (accountControlError) return reply(500, { error: "Could not verify account access." });
+        if (accountControl?.status === "blocked") return reply(403, { error: accountControl.reason || "This account has been blocked by an administrator." });
+      }
+    }
+  }
+
   const forwarded = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown";
   const ipAddress = forwarded.split(",")[0].trim().slice(0, 100) || "unknown";
   const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
