@@ -118,7 +118,7 @@ export const api = {
     }
 
     if (path === '/api/admin/recovery-requests') {
-      const response = await invokeAccountAuth({ action: 'admin-recovery-list' });
+      const response = await invokeAccountAuth({ action: 'admin-recovery-list', sessionId: localStorage.getItem('omni_ffm_active_session_id') || '' });
       return result({ requests: response?.requests || [] });
     }
 
@@ -146,6 +146,7 @@ export const api = {
     if (path === '/api/admin/recovery-requests/resolve') {
       const response = await invokeAccountAuth({
         action: 'admin-recovery-resolve',
+        sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
         requestId: String(body.requestId || ''),
         newPassword: String(body.newPassword || ''),
       });
