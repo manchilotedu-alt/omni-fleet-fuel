@@ -48,7 +48,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: Check account-auth Edge Function
-        run: deno check supabase/functions/account-auth/index.ts
+        run: deno check --node-modules-dir=auto supabase/functions/account-auth/index.ts
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
