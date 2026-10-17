@@ -10,7 +10,7 @@ This feature is being developed on `feat/device-and-account-access-control`. The
 - Device block is global to the device registration: deny sign-in/signup and app data for every account on that device.
 - New/unrecognized device registrations default to `pending`; do not silently approve them.
 - Unblocking an account must not unblock a device, and unblocking a device must not unblock an account.
-- Record administrator, reason, and timestamps for approval/block transitions.
+- Record administrator, reason, and timestamps for approval/block transitions in an append-only audit table; status changes and audit events are written atomically.
 - Never delete users, organization memberships, or fleet data as a side effect of blocking.
 - Control tables are service-role-only; clients must not read or write them directly.
 - All existing sessions must be rechecked against server-side account and device status, not only at login.
