@@ -257,6 +257,18 @@ Deno.serve(async (req: Request) => {
     if (adminMembershipError || !adminMembership?.organization_id) return reply(403, { error: "Only an organization administrator can manage access controls." });
     const organizationId = adminMembership.organization_id;
 
+    const { data: callerControl, error: callerControlError } = await admin.from("account_access_controls")
+      .select("status,reason").eq("user_id", caller.id).maybeSingle();
+    if (callerControlError) return reply(500, { error: "Could not verify administrator account status." });
+    if (callerControl?.status === "blocked") return reply(403, { error: callerControl.reason || "This account has been blocked by an administrator." });
+    const callerDeviceId = String(caller.app_metadata?.active_device_access_id || "");
+    if (callerDeviceId) {
+      const { data: callerDevice, error: callerDeviceError } = await admin.from("device_access_controls")
+        .select("status").eq("id", callerDeviceId).maybeSingle();
+      if (callerDeviceError) return reply(500, { error: "Could not verify administrator device status." });
+      if (callerDevice?.status === "blocked") return reply(403, { error: "This device has been blocked by an administrator." });
+    }
+
     if (action === "admin-access-list") {
       const { data: members, error: membersError } = await admin.from("organization_members")
         .select("user_id,role").eq("organization_id", organizationId);
@@ -308,6 +320,7 @@ Deno.serve(async (req: Request) => {
       return reply(200, { ok: true, message: status === "blocked" ? "Account blocked on all devices." : "Account access restored." });
     }
 
+    if (operation === "block" && targetId === callerDeviceId) return reply(400, { error: "Use another approved administrator device to block this device." });
     const { data: deviceLink, error: deviceLinkError } = await admin.from("device_access_memberships")
       .select("device_id").eq("organization_id", organizationId).eq("device_id", targetId).limit(1).maybeSingle();
     if (deviceLinkError || !deviceLink) return reply(403, { error: "This device is outside your organization." });
