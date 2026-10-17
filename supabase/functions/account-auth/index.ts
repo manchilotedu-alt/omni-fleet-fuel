@@ -63,6 +63,18 @@ async function deviceHash(secret: string, deviceId: string): Promise<string> {
   return Array.from(signature, b => b.toString(16).padStart(2, "0")).join("");
 }
 
+function supabaseSessionId(accessToken: string): string {
+  try {
+    const part = accessToken.split(".")[1];
+    if (!part) return "";
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(base64));
+    return typeof payload.session_id === "string" ? payload.session_id : "";
+  } catch {
+    return "";
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return reply(405, { error: "Method not allowed." });
@@ -186,6 +198,8 @@ Deno.serve(async (req: Request) => {
       if (!/^[0-9a-f-]{36}$/i.test(sessionId) || !/^[0-9a-f-]{36}$/i.test(deviceId)) {
         return reply(400, { error: "A valid session and device identifier are required." });
       }
+      const supabaseSession = supabaseSessionId(accessToken);
+      if (!supabaseSession) return reply(401, { error: "Your secure login session could not be verified. Please sign in again." });
       const hash = await deviceHash(serviceKey, deviceId);
       let { data: device, error: deviceError } = await admin
         .from("device_access_controls")
@@ -256,6 +270,7 @@ Deno.serve(async (req: Request) => {
       const appMetadata = {
         ...(caller.app_metadata || {}),
         active_session_id: sessionId,
+        active_supabase_session_id: supabaseSession,
         active_device_access_id: device.id,
       };
       const { error: updateError } = await admin.auth.admin.updateUserById(caller.id, { app_metadata: appMetadata });
