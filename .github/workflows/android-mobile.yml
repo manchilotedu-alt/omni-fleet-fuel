@@ -38,7 +38,7 @@ permissions:
   contents: write
 
 jobs:
-  build-android:
+  check-edge-function:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -49,6 +49,12 @@ jobs:
           deno-version: v2.x
       - name: Check account-auth Edge Function
         run: deno check --node-modules-dir=auto supabase/functions/account-auth/index.ts
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
