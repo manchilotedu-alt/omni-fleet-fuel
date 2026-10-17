@@ -475,7 +475,8 @@ Deno.serve(async (req: Request) => {
     await admin.from("account_recovery_attempts").delete().lt("attempted_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
   }
 
-  if (await limited()) return reply(429, { error: "Too many attempts. Please wait 15 minutes and try again." });
+  // Keep recovery verification rate-limited, but do not lock users out of normal sign-in on another device.
+  if (action === "recover" && await limited()) return reply(429, { error: "Too many recovery attempts. Please wait 15 minutes and try again." });
 
   // Prepare legacy phone-only accounts for password sign-in without enabling SMS/OTP.
   if (action === "prepare-login") {
