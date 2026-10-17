@@ -241,7 +241,9 @@ Deno.serve(async (req: Request) => {
       const { data: device, error: deviceError } = await admin.from("device_access_controls")
         .select("id,status").eq("id", deviceId).eq("device_key_hash", hash).maybeSingle();
       if (deviceError) return reply(500, { error: "Could not verify device access." });
-      if (!device || device.status !== "approved") return reply(403, { error: device?.status === "blocked" ? "This device has been blocked by an administrator." : "This device is waiting for administrator approval." });
+      if (!device) return reply(403, { error: "This device is not registered." });
+      if (device.status === "blocked") return reply(403, { error: "This device has been blocked by an administrator." });
+      if (device.status !== "approved") return reply(200, { ok: false, deviceStatus: "pending", message: "This device is waiting for administrator approval." });
       const { data: accountControl, error: accountError } = await admin.from("account_access_controls")
         .select("status,reason").eq("user_id", caller.id).maybeSingle();
       if (accountError) return reply(500, { error: "Could not verify account access." });
