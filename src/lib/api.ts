@@ -172,6 +172,7 @@ export const api = {
     if (path === '/api/auth/signup') {
       await invokeAccountAuth({
         action: 'signup',
+        deviceId: currentDeviceId(),
         phone: body.phone,
         password: String(body.password || ''),
         fullName: String(body.name || '').trim(),
