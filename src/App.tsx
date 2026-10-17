@@ -1757,20 +1757,20 @@ function AccessControlsPage({ onNotify }: { onNotify: (message: string) => void 
       <div><h2 className="plain-title">{t('Account and Device Access')}</h2><span className="muted">Account blocks apply on every phone. Device blocks apply to every account on that phone.</span></div>
       <button type="button" className="outline" onClick={() => void load()} disabled={loading}>Refresh</button>
     </div>
-    {error && <div className="error-banner"><AlertTriangle size={17} /> {error}</div>}
-    {loading ? <div className="empty-state">Loading access records…</div> : <>
-      <section className="panel">
+    {error && <div className="access-control-error"><AlertTriangle size={17} /> {error}</div>}
+    {loading ? <div className="access-control-loading">Loading access records…</div> : <>
+      <section className="access-control-panel">
         <div className="section-title"><UserCog size={18} /><h2>Accounts</h2></div>
-        {accounts.length === 0 ? <p className="muted">No organization accounts found.</p> : accounts.map(account => <div className="list-row" key={account.id}>
-          <div className="list-main"><strong>{account.full_name || account.phone || account.id}</strong><small>{account.phone || ''} · {account.role}</small><small className={account.status === 'blocked' ? 'status-danger' : 'muted'}>{account.status === 'blocked' ? 'Blocked' : 'Active'}{account.reason ? ` · ${account.reason}` : ''}</small></div>
-          <button type="button" className={account.status === 'blocked' ? 'outline' : 'danger'} disabled={busy === account.id} onClick={() => void change('account', account.id, account.status === 'blocked' ? 'unblock' : 'block')}>{busy === account.id ? 'Please wait…' : account.status === 'blocked' ? 'Unblock' : 'Block account'}</button>
+        {accounts.length === 0 ? <p className="muted">No organization accounts found.</p> : accounts.map(account => <div className="access-control-list-row" key={account.id}>
+          <div className="access-control-list-main"><strong>{account.full_name || account.phone || account.id}</strong><small>{account.phone || ''} · {account.role}</small><small className={account.status === 'blocked' ? 'access-blocked' : 'muted'}>{account.status === 'blocked' ? 'Blocked' : 'Active'}{account.reason ? ` · ${account.reason}` : ''}</small></div>
+          <button type="button" className={account.status === 'blocked' ? 'outline' : 'access-control-danger'} disabled={busy === account.id} onClick={() => void change('account', account.id, account.status === 'blocked' ? 'unblock' : 'block')}>{busy === account.id ? 'Please wait…' : account.status === 'blocked' ? 'Unblock' : 'Block account'}</button>
         </div>)}
       </section>
-      <section className="panel">
+      <section className="access-control-panel">
         <div className="section-title"><Smartphone size={18} /><h2>Registered devices</h2></div>
-        {uniqueDevices.length === 0 ? <p className="muted">No devices have registered yet. Devices appear after a user signs in.</p> : uniqueDevices.map(device => <div className="list-row" key={device.id}>
-          <div className="list-main"><strong>{device.device_label || 'Registered device'}</strong><small>{device.user_name || 'Fleet user'}{device.last_seen_at ? ` · Last seen ${new Date(device.last_seen_at).toLocaleString()}` : ''}</small><small className={device.status === 'blocked' ? 'status-danger' : 'muted'}>{device.status}{device.reason ? ` · ${device.reason}` : ''}</small></div>
-          <button type="button" className={device.status === 'blocked' ? 'outline' : 'danger'} disabled={busy === device.id} onClick={() => void change('device', device.id, device.status === 'blocked' ? 'unblock' : device.status === 'pending' ? 'approve' : 'block')}>{busy === device.id ? 'Please wait…' : device.status === 'blocked' ? 'Unblock device' : device.status === 'pending' ? 'Approve device' : 'Block device'}</button>
+        {uniqueDevices.length === 0 ? <p className="muted">No devices have registered yet. Devices appear after a user signs in.</p> : uniqueDevices.map(device => <div className="access-control-list-row" key={device.id}>
+          <div className="access-control-list-main"><strong>{device.device_label || 'Registered device'}</strong><small>{device.user_name || 'Fleet user'}{device.last_seen_at ? ` · Last seen ${new Date(device.last_seen_at).toLocaleString()}` : ''}</small><small className={device.status === 'blocked' ? 'access-blocked' : 'muted'}>{device.status}{device.reason ? ` · ${device.reason}` : ''}</small></div>
+          <button type="button" className={device.status === 'blocked' ? 'outline' : 'access-control-danger'} disabled={busy === device.id} onClick={() => void change('device', device.id, device.status === 'blocked' ? 'unblock' : device.status === 'pending' ? 'approve' : 'block')}>{busy === device.id ? 'Please wait…' : device.status === 'blocked' ? 'Unblock device' : device.status === 'pending' ? 'Approve device' : 'Block device'}</button>
         </div>)}
       </section>
       <div className="settings-security"><ShieldCheck size={18} /><span>Blocking does not delete the account, memberships, vehicles, fuel history, or organization data.</span></div>
