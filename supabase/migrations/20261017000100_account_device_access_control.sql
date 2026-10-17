@@ -72,7 +72,7 @@ create table if not exists public.access_control_audit_events (
   target_type text not null check (target_type in ('account', 'device')),
   target_id uuid not null,
   action text not null check (action in ('block', 'unblock', 'approve')),
-  actor_user_id uuid references auth.users(id) on delete set null,
+  actor_user_id uuid, -- Keep the historical actor ID immutable even if the user is later deleted.
   reason text,
   created_at timestamptz not null default now()
 );
