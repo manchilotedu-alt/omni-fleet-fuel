@@ -25,14 +25,11 @@ begin
     return false;
   end if;
 
-  begin
-    v_device_id := nullif(
-      current_setting('request.jwt.claims', true)::jsonb #>> '{app_metadata,active_device_access_id}',
-      ''
-    )::uuid;
-  exception when others then
-    return false;
-  end;
+  -- Read the current server-side app metadata rather than relying on a potentially stale JWT claim.
+  select nullif(u.raw_app_meta_data ->> 'active_device_access_id', '')::uuid
+    into v_device_id
+  from auth.users u
+  where u.id = v_user_id;
 
   if v_device_id is null then
     return false;
