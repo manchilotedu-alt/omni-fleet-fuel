@@ -144,7 +144,7 @@ begin
   values (v_target_type, v_target_id, v_action, v_actor_id, v_reason);
   return NEW;
 end;
-$;
+$$;
 
 revoke all on function private.log_access_control_transition() from public, anon, authenticated;
 create trigger account_access_controls_audit
@@ -165,7 +165,7 @@ as $$
 begin
   raise exception 'Access-control audit events are immutable.';
 end;
-$;
+$$;
 revoke all on function private.prevent_access_control_audit_mutation() from public, anon, authenticated;
 create trigger access_control_audit_immutable
   before update or delete on public.access_control_audit_events
