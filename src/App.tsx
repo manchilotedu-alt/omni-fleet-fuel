@@ -44,7 +44,7 @@ import * as React from 'react';
 
 type Lang = 'en' | 'am';
 const APP_VERSION = '1.0.1';
-type AppUser = { id: string; email: string; name: string; phone?: string };
+type AppUser = { id: string; email: string; name: string; phone?: string; mustChangePassword?: boolean };
 
 const translations: Record<string, string> = {
   'Dashboard': 'ዳሽቦርድ',
@@ -1139,6 +1139,10 @@ function AppContent() {
     return <Login initialRecovery={passwordRecovery} onRecoveryComplete={() => setPasswordRecovery(false)} lang={lang} setLang={setLang} onLogin={user => { localStorage.setItem('omni_ffm_last_name', user.name); sessionStorage.setItem('omni_ffm_session_open', '1'); setAuthUser(user); }} />;
   }
 
+  if (authUser?.mustChangePassword) {
+    return <PasswordChangeGate onComplete={() => { setAuthUser(null); setIsPlatformOwner(false); }} />;
+  }
+
   if (!dataReady) {
     return <div className="auth-loading"><img className="auth-loading-logo" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /><strong>{t('Checking secure session...')}</strong></div>;
   }
@@ -1864,6 +1868,58 @@ function RecoveryRequestsPage({ onNotify }: { onNotify: (message: string) => voi
           </div> : '—'}</td>
         </tr>)}</tbody></table></div>}
   </div>;
+}
+
+function PasswordChangeGate({ onComplete }: { onComplete: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setNotice('');
+    if (newPassword.length < 12 || newPassword.length > 128) {
+      setError('Choose a new password containing 12–128 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('The new passwords do not match.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setError('Choose a password different from the temporary password.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post('/api/auth/change-password', { currentPassword, newPassword });
+      await api.post('/api/auth/logout');
+      setNotice('Password changed. Sign in again with your new password.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      onComplete();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Password change failed. Please try again.');
+    } finally { setBusy(false); }
+  };
+
+  return <div className="login-page"><div className="login-shell"><div className="login-card">
+    <div className="login-logo-ring"><img className="login-logo-image" src="/omni-fleet-fuel-logo.svg" alt="OMNI Fleet Fuel" /></div>
+    <div className="login-brand"><div className="login-welcome">Change your temporary password</div><p>You must choose a new password before using OMNI Fleet Fuel.</p></div>
+    <form className="login-form" onSubmit={submit}>
+      <label className="login-field"><span>Temporary / current password</span><div className="login-input-shell"><input value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} type="password" autoComplete="current-password" minLength={8} maxLength={128} required /></div></label>
+      <label className="login-field"><span>New password</span><div className="login-input-shell"><input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></div></label>
+      <label className="login-field"><span>Confirm new password</span><div className="login-input-shell"><input value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></div></label>
+      {error && <div className="login-error" role="alert">{error}</div>}
+      {notice && <div className="login-notice" role="status">{notice}</div>}
+      <button className="primary login-submit" type="submit" disabled={busy}>{busy ? 'Changing password…' : 'Change password and continue'}</button>
+    </form>
+  </div></div></div>;
 }
 
 function UserManagement({ onNotify }: { users?: UserRecord[]; setUsers?: React.Dispatch<React.SetStateAction<UserRecord[]>>; onNotify: (s: string) => void }) {
