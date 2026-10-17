@@ -212,7 +212,7 @@ Deno.serve(async (req: Request) => {
       let shouldAutoApprove = false;
       const { data: accessSettings } = await admin.from("account_device_access_settings")
         .select("enforced_since").eq("id", true).maybeSingle();
-      const bootstrapCutoff = accessSettings?.enforced_since ? Date.parse(accessSettings.enforced_since) : Number.POSITIVE_INFINITY;
+      const bootstrapCutoff = accessSettings?.enforced_since ? Date.parse(accessSettings.enforced_since) : Number.NEGATIVE_INFINITY;
       const callerCreatedAt = Date.parse(String(caller.created_at || ""));
       for (const membership of memberships || []) {
         const { error: linkError } = await admin.from("device_access_memberships").upsert({
