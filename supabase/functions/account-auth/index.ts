@@ -198,6 +198,12 @@ Deno.serve(async (req: Request) => {
       if (!/^[0-9a-f-]{36}$/i.test(sessionId) || !/^[0-9a-f-]{36}$/i.test(deviceId)) {
         return reply(400, { error: "A valid session and device identifier are required." });
       }
+      const { data: activationAccountControl, error: activationAccountError } = await admin.from("account_access_controls")
+        .select("status,reason").eq("user_id", caller.id).maybeSingle();
+      if (activationAccountError) return reply(500, { error: "Could not verify account access." });
+      if (activationAccountControl?.status === "blocked") {
+        return reply(403, { error: activationAccountControl.reason || "This account has been blocked by an administrator." });
+      }
       const supabaseSession = supabaseSessionId(accessToken);
       if (!supabaseSession) return reply(401, { error: "Your secure login session could not be verified. Please sign in again." });
       const hash = await deviceHash(serviceKey, deviceId);
@@ -364,6 +370,7 @@ Deno.serve(async (req: Request) => {
       return reply(400, { error: "Choose a valid account/device access action." });
     }
     if (kind === "account") {
+      if (operation === "approve") return reply(400, { error: "Account access can only be blocked or unblocked." });
       const { data: member, error: memberError } = await admin.from("organization_members")
         .select("user_id").eq("organization_id", organizationId).eq("user_id", targetId).maybeSingle();
       if (memberError || !member) return reply(403, { error: "This account is outside your organization." });
