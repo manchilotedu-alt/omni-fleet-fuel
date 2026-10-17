@@ -83,6 +83,13 @@ Deno.serve(async (req: Request) => {
   if (deviceError) return reply(500, { error: "Could not verify this device." });
   if (device?.status !== "approved") return reply(403, { error: "This device is not approved for Platform Owner access." });
 
+  const { data: ownerAccountControl, error: ownerAccountError } = await admin.from("account_access_controls")
+    .select("status,reason").eq("user_id", caller.id).maybeSingle();
+  if (ownerAccountError) return reply(500, { error: "Could not verify Platform Owner account status." });
+  if (ownerAccountControl?.status === "blocked") {
+    return reply(403, { error: ownerAccountControl.reason || "This account has been blocked." });
+  }
+
   const audit = async (targetUserId: string | null, event: string, details: Record<string, unknown> = {}) => {
     const { error } = await admin.from("platform_owner_audit_events").insert({
       actor_user_id: caller.id,
