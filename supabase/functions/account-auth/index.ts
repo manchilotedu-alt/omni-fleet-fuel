@@ -290,9 +290,9 @@ Deno.serve(async (req: Request) => {
         ? await admin.from("device_access_controls").select("id,status,device_label,reason,first_seen_at,last_seen_at,blocked_at").in("id", deviceIds)
         : { data: [] as Record<string, unknown>[], error: null };
       if (devicesError) return reply(500, { error: "Could not load device status." });
-      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-      const accountMap = new Map((accounts || []).map((a: any) => [a.user_id, a]));
-      const deviceMap = new Map((devices || []).map((d: any) => [d.id, d]));
+      const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.id, p] as [string, any]));
+      const accountMap = new Map<string, any>((accounts || []).map((a: any) => [a.user_id, a] as [string, any]));
+      const deviceMap = new Map<string, any>((devices || []).map((d: any) => [d.id, d] as [string, any]));
       return reply(200, {
         accounts: (members || []).map((m: any) => ({ ...profileMap.get(m.user_id), role: m.role, status: accountMap.get(m.user_id)?.status || "active", reason: accountMap.get(m.user_id)?.reason || "", blocked_at: accountMap.get(m.user_id)?.blocked_at || null })),
         devices: (links || []).map((link: any) => ({ ...deviceMap.get(link.device_id), user_id: link.user_id, user_name: profileMap.get(link.user_id)?.full_name || "Fleet user", first_seen_at: link.first_seen_at, last_seen_at: link.last_seen_at })),
