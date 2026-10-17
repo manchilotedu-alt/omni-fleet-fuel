@@ -132,6 +132,11 @@ const emptyState = {
 
 export const api = {
   async get(path: string): Promise<ApiResponse<any>> {
+    if (path === '/api/platform-admin/check') {
+      const response = await invokePlatformAdmin({ action: 'status' });
+      return result({ isPlatformOwner: response?.allowed === true });
+    }
+
     if (path === '/api/platform-admin/users') {
       const response = await invokePlatformAdmin({ action: 'list-users', page: 1, perPage: 100 });
       return result({ users: response?.users || [], page: response?.page || 1, total: response?.total ?? null });
