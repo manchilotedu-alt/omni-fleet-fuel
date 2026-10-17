@@ -86,7 +86,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_old_status text;
   v_new_status text := to_jsonb(NEW) ->> 'status';
@@ -161,7 +161,7 @@ create or replace function private.prevent_access_control_audit_mutation()
 returns trigger
 language plpgsql
 set search_path = ''
-as $
+as $$
 begin
   raise exception 'Access-control audit events are immutable.';
 end;
