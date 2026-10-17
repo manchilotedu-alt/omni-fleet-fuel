@@ -91,6 +91,12 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch { return reply(400, { error: "Invalid request." }); }
   const action = String(body.action ?? "");
 
+  // Self-registration is disabled: accounts are provisioned only by the verified Platform Owner.
+  // Keep the existing login/recovery/device flows intact.
+  if (action === "signup") {
+    return reply(403, { error: "Self-registration is disabled. Contact the OMNI Fleet Fuel Platform Owner to receive an account." });
+  }
+
   // Administrative recovery actions are authenticated with the caller's Supabase access token.
   // The service-role client is used only after the caller is verified and scoped to their own organization.
   if (action === "admin-recovery-list" || action === "admin-recovery-resolve") {
