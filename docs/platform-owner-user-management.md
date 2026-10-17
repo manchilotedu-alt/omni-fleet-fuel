@@ -41,10 +41,10 @@ The `account-auth` `access-check` action now checks subscription status after va
 - A current trial is allowed only while `trial_ends_at` is in the future.
 - `paid` is allowed if `paid_through` is empty or has not passed.
 - `comped` accounts remain allowed.
-- `unpaid`, `overdue`, `expired`, expired trials and invalid trial records are denied access to fleet API operations.
+- `unpaid`, `overdue`, `expired`, expired trials and invalid trial records are denied by the app's server-checked access path.
 - Existing users without a subscription row remain usable for rollout compatibility. New Platform Owner-created users receive a subscription row.
 
-This policy requires the schema migration and matching Edge Function version to be deployed together. Until that approved rollout occurs, live payment enforcement is not active.
+**Release blocker:** the current restrictive RLS helper in migration `20261017000200_enforce_account_device_access.sql` still checks session/account/device state but not subscription status. The Edge Function check alone is not a complete database-level enforcement boundary if a client calls Supabase tables directly. Extend and test the restrictive RLS helper for subscription state before describing payment expiry as fully enforced. This policy also requires the schema migration and matching Edge Functions to be deployed together. Until that approved rollout occurs, live payment enforcement is not active.
 
 ## Required first-time provisioning and release checks
 
