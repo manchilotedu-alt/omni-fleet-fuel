@@ -12,8 +12,19 @@ declare
   v_device_id uuid;
   v_account_status text;
   v_device_status text;
+  v_jwt_session_id text := auth.jwt() ->> 'session_id';
+  v_active_supabase_session_id text;
 begin
-  if v_user_id is null then
+  if v_user_id is null or v_jwt_session_id is null then
+    return false;
+  end if;
+
+  select nullif(u.raw_app_meta_data ->> 'active_supabase_session_id', '')
+    into v_active_supabase_session_id
+  from auth.users u
+  where u.id = v_user_id;
+
+  if v_active_supabase_session_id is null or v_active_supabase_session_id <> v_jwt_session_id then
     return false;
   end if;
 
@@ -25,7 +36,7 @@ begin
     return false;
   end if;
 
-  -- Read the current server-side app metadata rather than relying on a potentially stale JWT claim.
+  -- Device and session bindings are read from current server-side metadata.
   select nullif(u.raw_app_meta_data ->> 'active_device_access_id', '')::uuid
     into v_device_id
   from auth.users u
