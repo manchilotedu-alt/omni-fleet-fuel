@@ -105,6 +105,10 @@ Deno.serve(async (req: Request) => {
     const { data: callerData, error: callerError } = await callerClient.auth.getUser(accessToken);
     if (callerError || !callerData.user) return reply(401, { error: "Your session is invalid. Please sign in again." });
     const recoveryCaller = callerData.user;
+    const recoveryJwtSessionId = supabaseSessionId(accessToken);
+    if (!recoveryJwtSessionId || recoveryJwtSessionId !== String(recoveryCaller.app_metadata?.active_supabase_session_id || "")) {
+      return reply(401, { error: "Your secure login session is no longer active." });
+    }
     const { data: recoveryAccountControl, error: recoveryAccountError } = await admin.from("account_access_controls")
       .select("status,reason").eq("user_id", recoveryCaller.id).maybeSingle();
     if (recoveryAccountError) return reply(500, { error: "Could not verify administrator account status." });
@@ -311,6 +315,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "access-check") {
+      const jwtSessionId = supabaseSessionId(accessToken);
+      if (!jwtSessionId || jwtSessionId !== String(caller.app_metadata?.active_supabase_session_id || "")) {
+        return reply(401, { error: "This secure login session is no longer active." });
+      }
       const deviceId = String(caller.app_metadata?.active_device_access_id || "");
       const sessionId = String(body.sessionId || "");
       const localDeviceId = String(body.deviceId || "");
@@ -330,6 +338,10 @@ Deno.serve(async (req: Request) => {
       return reply(200, { ok: true });
     }
 
+    const adminJwtSessionId = supabaseSessionId(accessToken);
+    if (!adminJwtSessionId || adminJwtSessionId !== String(caller.app_metadata?.active_supabase_session_id || "")) {
+      return reply(401, { error: "This secure administrator session is no longer active." });
+    }
     const { data: adminMembership, error: adminMembershipError } = await admin
       .from("organization_members").select("organization_id")
       .eq("user_id", caller.id).eq("role", "admin").limit(1).maybeSingle();
