@@ -66,3 +66,18 @@ comment on table public.platform_user_subscriptions is
   'Platform-controlled trial and payment state, independent of account/device access controls.';
 comment on table public.platform_owner_audit_events is
   'Append-only audit history for Platform Owner account and subscription administration; never store passwords.';
+
+create or replace function private.prevent_platform_owner_audit_mutation()
+returns trigger
+language plpgsql
+set search_path = ''
+as $
+begin
+  raise exception 'Platform Owner audit events are immutable.';
+end;
+$;
+revoke all on function private.prevent_platform_owner_audit_mutation() from public, anon, authenticated;
+drop trigger if exists platform_owner_audit_immutable on public.platform_owner_audit_events;
+create trigger platform_owner_audit_immutable
+  before update or delete on public.platform_owner_audit_events
+  for each row execute function private.prevent_platform_owner_audit_mutation();
