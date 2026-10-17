@@ -811,6 +811,7 @@ function AppContent() {
   // Translation is rendered through React's t() helper. Do not mutate React-managed DOM with a MutationObserver because external text/attribute changes can conflict with React reconciliation and cause page render failures.
   const [authReady, setAuthReady] = useState(false);
   const [authUser, setAuthUser] = useState<AppUser | null>(null);
+  const [isPlatformOwner, setIsPlatformOwner] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(() => localStorage.getItem('omni_ffm_biometric_enabled') === '1');
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [active, setActive] = useState('Dashboard');
@@ -912,6 +913,18 @@ function AppContent() {
   }, []);
 
   const loggedIn = Boolean(authUser);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!authUser) {
+      setIsPlatformOwner(false);
+      return () => { mounted = false; };
+    }
+    void api.get('/api/platform-admin/check')
+      .then(response => { if (mounted) setIsPlatformOwner(response.data?.isPlatformOwner === true); })
+      .catch(() => { if (mounted) setIsPlatformOwner(false); });
+    return () => { mounted = false; };
+  }, [authUser?.id]);
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -1181,9 +1194,11 @@ function AppContent() {
         <div className="nav-sep" />
         <NavItem icon={<UserCircle />} label={t('Profile')} active={active === 'Profile'} onClick={() => navigate('Profile')} />
         <NavItem icon={<Settings />} label={t('Settings')} active={active === 'Settings'} onClick={() => navigate('Settings')} />
-        <NavItem icon={<UserCog />} label={t('User Management')} active={active === 'User Management'} onClick={() => navigate('User Management')} />
-        <NavItem icon={<KeyRound />} label={t('Recovery Requests')} active={active === 'Recovery Requests'} onClick={() => navigate('Recovery Requests')} />
-        <NavItem icon={<ShieldCheck />} label={t('Access Controls')} active={active === 'Access Controls'} onClick={() => navigate('Access Controls')} />
+        {isPlatformOwner && <>
+          <NavItem icon={<UserCog />} label={t('User Management')} active={active === 'User Management'} onClick={() => navigate('User Management')} />
+          <NavItem icon={<KeyRound />} label={t('Recovery Requests')} active={active === 'Recovery Requests'} onClick={() => navigate('Recovery Requests')} />
+          <NavItem icon={<ShieldCheck />} label={t('Access Controls')} active={active === 'Access Controls'} onClick={() => navigate('Access Controls')} />
+        </>}
       </aside>
       <main className="main">
         <div className="page-head"><div><div className="crumb">{translateStatic("omni-Fleet")} <span>/</span> {t(active === 'Dashboard' ? 'Home' : active)}</div><h1>{t(active === 'Dashboard' ? 'Home' : active)}</h1></div><div className="head-actions">{active === 'Vehicle List' && <button className="primary" onClick={() => navigate('Add Vehicle')}><Plus size={17} /> Add Vehicle</button>}{active === 'Dashboard' && <button className="outline" onClick={() => navigate('Reports')}><FileText size={16} /> {t('View Report')}</button>}</div></div>
