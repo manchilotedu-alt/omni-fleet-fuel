@@ -347,6 +347,13 @@ Deno.serve(async (req: Request) => {
       .eq("user_id", caller.id).eq("role", "admin").limit(1).maybeSingle();
     if (adminMembershipError || !adminMembership?.organization_id) return reply(403, { error: "Only an organization administrator can manage access controls." });
     const organizationId = adminMembership.organization_id;
+    // Because account/device blocks are global, the operator must administer every organization
+    // affected by the target. A single-organization admin must not affect another tenant.
+    const { data: callerAdminMemberships, error: callerAdminMembershipsError } = await admin
+      .from("organization_members").select("organization_id")
+      .eq("user_id", caller.id).eq("role", "admin");
+    if (callerAdminMembershipsError) return reply(500, { error: "Could not verify administrator scope." });
+    const callerAdminOrganizationIds = new Set((callerAdminMemberships || []).map((m: { organization_id: string }) => m.organization_id));
 
     const { data: callerControl, error: callerControlError } = await admin.from("account_access_controls")
       .select("status,reason").eq("user_id", caller.id).maybeSingle();
@@ -409,9 +416,14 @@ Deno.serve(async (req: Request) => {
     }
     if (kind === "account") {
       if (operation === "approve") return reply(400, { error: "Account access can only be blocked or unblocked." });
-      const { data: member, error: memberError } = await admin.from("organization_members")
-        .select("user_id").eq("organization_id", organizationId).eq("user_id", targetId).maybeSingle();
-      if (memberError || !member) return reply(403, { error: "This account is outside your organization." });
+      const { data: targetMemberships, error: memberError } = await admin.from("organization_members")
+        .select("organization_id").eq("user_id", targetId);
+      if (memberError) return reply(500, { error: "Could not verify the target account's organization scope." });
+      const targetOrganizationIds = [...new Set((targetMemberships || []).map((m: { organization_id: string }) => m.organization_id))];
+      if (!targetOrganizationIds.includes(organizationId)) return reply(403, { error: "This account is outside your organization." });
+      if (targetOrganizationIds.some((id) => !callerAdminOrganizationIds.has(id))) {
+        return reply(403, { error: "This account belongs to another organization you do not administer. A global account block requires authorization across every organization linked to the account." });
+      }
       if (targetId === caller.id && operation === "block") return reply(400, { error: "You cannot block your own administrator account." });
       const status = operation === "block" ? "blocked" : "active";
       const { error } = await admin.from("account_access_controls").upsert({
@@ -423,9 +435,14 @@ Deno.serve(async (req: Request) => {
     }
 
     if (operation === "block" && targetId === callerDeviceId) return reply(400, { error: "Use another approved administrator device to block this device." });
-    const { data: deviceLink, error: deviceLinkError } = await admin.from("device_access_memberships")
-      .select("device_id").eq("organization_id", organizationId).eq("device_id", targetId).limit(1).maybeSingle();
-    if (deviceLinkError || !deviceLink) return reply(403, { error: "This device is outside your organization." });
+    const { data: deviceLinks, error: deviceLinkError } = await admin.from("device_access_memberships")
+      .select("organization_id").eq("device_id", targetId);
+    if (deviceLinkError) return reply(500, { error: "Could not verify the target device's organization scope." });
+    const deviceOrganizationIds = [...new Set((deviceLinks || []).map((link: { organization_id: string }) => link.organization_id))];
+    if (!deviceOrganizationIds.includes(organizationId)) return reply(403, { error: "This device is outside your organization." });
+    if (deviceOrganizationIds.some((id) => !callerAdminOrganizationIds.has(id))) {
+      return reply(403, { error: "This device is linked to another organization you do not administer. A global device action requires authorization across every linked organization." });
+    }
     const status = operation === "block" ? "blocked" : "approved";
     const { error } = await admin.from("device_access_controls").update({
       status, reason: status === "blocked" ? (reason || "Blocked by organization administrator.") : null,
