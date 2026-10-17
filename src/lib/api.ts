@@ -38,11 +38,14 @@ async function currentUser() {
     await supabase.auth.signOut();
     fail('This account was signed in on another device. Please sign in again.', 401);
   }
-  await invokeAccountAuth({
+  const access = await invokeAccountAuth({
     action: 'access-check',
     sessionId: localSessionId,
     deviceId: currentDeviceId(),
   });
+  if (access?.ok !== true) {
+    fail(access?.message || 'This device is waiting for administrator approval.', 403);
+  }
   return data.user;
 }
 
@@ -123,7 +126,11 @@ export const api = {
     }
 
     if (path === '/api/admin/access-controls') {
-      const response = await invokeAccountAuth({ action: 'admin-access-list' });
+      const response = await invokeAccountAuth({
+        action: 'admin-access-list',
+        sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+        deviceId: currentDeviceId(),
+      });
       return result({ accounts: response?.accounts || [], devices: response?.devices || [] });
     }
 
@@ -156,6 +163,8 @@ export const api = {
     if (path === '/api/admin/access-controls') {
       const response = await invokeAccountAuth({
         action: 'admin-access-set',
+        sessionId: localStorage.getItem('omni_ffm_active_session_id') || '',
+        deviceId: currentDeviceId(),
         kind: String(body.kind || ''),
         targetId: String(body.targetId || ''),
         operation: String(body.operation || ''),
