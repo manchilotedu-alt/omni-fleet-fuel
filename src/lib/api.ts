@@ -199,7 +199,12 @@ export const api = {
       throwSupabaseError(error);
       if (!data.user) fail('The account was created, but sign-in could not be completed. Please sign in manually.', 401);
       const sessionId = crypto.randomUUID();
-      await invokeAccountAuth({ action: 'activate-session', sessionId, deviceId: currentDeviceId(), deviceLabel: 'OMNI Fleet Fuel app' });
+      const activation = await invokeAccountAuth({ action: 'activate-session', sessionId, deviceId: currentDeviceId(), deviceLabel: 'OMNI Fleet Fuel app' });
+      if (activation?.deviceStatus !== 'approved') {
+        await supabase.auth.signOut();
+        localStorage.removeItem('omni_ffm_active_session_id');
+        fail('This device is waiting for administrator approval. An existing approved administrator or platform support must approve it before you can continue.', 403);
+      }
       localStorage.setItem('omni_ffm_active_session_id', sessionId);
       const refreshedSession = await supabase.auth.refreshSession();
       throwSupabaseError(refreshedSession.error);
@@ -219,7 +224,12 @@ export const api = {
       }
       if (!data.user) fail('Sign-in was not accepted. Check the phone number and password.', 401);
       const sessionId = crypto.randomUUID();
-      await invokeAccountAuth({ action: 'activate-session', sessionId, deviceId: currentDeviceId(), deviceLabel: 'OMNI Fleet Fuel app' });
+      const activation = await invokeAccountAuth({ action: 'activate-session', sessionId, deviceId: currentDeviceId(), deviceLabel: 'OMNI Fleet Fuel app' });
+      if (activation?.deviceStatus !== 'approved') {
+        await supabase.auth.signOut();
+        localStorage.removeItem('omni_ffm_active_session_id');
+        fail('This device is waiting for administrator approval. An existing approved administrator or platform support must approve it before you can continue.', 403);
+      }
       localStorage.setItem('omni_ffm_active_session_id', sessionId);
       return result({ user: userPayload(data.user) });
     }
